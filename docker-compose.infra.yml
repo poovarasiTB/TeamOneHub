@@ -1,0 +1,106 @@
+# TeamOne - Infrastructure Only (No Services)
+# Use this for local development without Docker services
+
+version: '3.8'
+
+services:
+  # PostgreSQL (Primary Database)
+  postgres:
+    image: postgres:16-alpine
+    container_name: teamone-postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=teamone
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./database/init-scripts:/docker-entrypoint-initdb.d
+    networks:
+      - teamone-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MongoDB
+  mongo:
+    image: mongo:7
+    container_name: teamone-mongo
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=mongo
+      - MONGO_INITDB_ROOT_PASSWORD=mongo
+      - MONGO_INITDB_DATABASE=teamone
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - teamone-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: teamone-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - teamone-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MinIO (File Storage)
+  minio:
+    image: minio/minio:latest
+    container_name: teamone-minio
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - teamone-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # Adminer (Database UI)
+  adminer:
+    image: adminer:latest
+    container_name: teamone-adminer
+    ports:
+      - "8081:8080"
+    environment:
+      - ADMINER_DEFAULT_SERVER=postgres
+    networks:
+      - teamone-network
+    depends_on:
+      - postgres
+
+volumes:
+  postgres-data:
+  mongo-data:
+  redis-data:
+  minio-data:
+
+networks:
+  teamone-network:
+    driver: bridge

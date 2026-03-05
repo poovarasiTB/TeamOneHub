@@ -1,0 +1,346 @@
+# TeamOne Prometheus Alert Rules
+
+groups:
+  # ═══════════════════════════════════════════════════════════════════
+  # Service Availability Alerts
+  # ═══════════════════════════════════════════════════════════════════
+  - name: service_availability
+    interval: 30s
+    rules:
+      - alert: ServiceDown
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.job }} is down"
+          description: "{{ $labels.instance }} of job {{ $labels.job }} has been down for more than 2 minutes."
+          runbook_url: "https://runbooks.teamone.local/service-down"
+
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m])) by (service)
+          /
+          sum(rate(http_requests_total[5m])) by (service)
+          > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate for {{ $labels.service }}"
+          description: "Service {{ $labels.service }} has error rate of {{ $value | humanizePercentage }}"
+          runbook_url: "https://runbooks.teamone.local/high-error-rate"
+
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, service))
+          > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High latency for {{ $labels.service }}"
+          description: "Service {{ $labels.service }} 95th percentile latency is {{ $value | humanizeDuration }}"
+          runbook_url: "https://runbooks.teamone.local/high-latency"
+
+  # ═══════════════════════════════════════════════════════════════════
+  # Database Alerts
+  # ═══════════════════════════════════════════════════════════════════
+  - name: database
+    interval: 30s
+    rules:
+      - alert: PostgreSQLDown
+        expr: pg_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL instance {{ $labels.instance }} is down"
+          runbook_url: "https://runbooks.teamone.local/postgres-down"
+
+      - alert: PostgreSQLHighConnections
+        expr: |
+          pg_stat_activity_count / pg_settings_max_connections * 100
+          > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL high connection count"
+          description: "PostgreSQL is using {{ $value | humanize }}% of max connections"
+          runbook_url: "https://runbooks.teamone.local/postgres-high-connections"
+
+      - alert: PostgreSQLLongRunningQueries
+        expr: |
+          max(pg_stat_activity_max_tx_duration)
+          > 300
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL long running queries"
+          description: "PostgreSQL has queries running for more than 5 minutes"
+          runbook_url: "https://runbooks.teamone.local/postgres-long-queries"
+
+      - alert: PostgreSQLReplicationLag
+        expr: |
+          pg_replication_lag
+          > 30
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL replication lag"
+          description: "PostgreSQL replication lag is {{ $value | humanizeDuration }}"
+          runbook_url: "https://runbooks.teamone.local/postgres-replication-lag"
+
+  # ═══════════════════════════════════════════════════════════════════
+  # Redis Alerts
+  # ═══════════════════════════════════════════════════════════════════
+  - name: redis
+    interval: 30s
+    rules:
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis is down"
+          description: "Redis instance {{ $labels.instance }} is down"
+          runbook_url: "https://runbooks.teamone.local/redis-down"
+
+      - alert: RedisHighMemory
+        expr: |
+          redis_memory_used_bytes / redis_memory_max_bytes * 100
+          > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis high memory usage"
+          description: "Redis is using {{ $value | humanize }}% of max memory"
+          runbook_url: "https://runbooks.teamone.local/redis-high-memory"
+
+      - alert: RedisHighEvictionRate
+        expr: |
+          rate(redis_evicted_keys_total[5m])
+          > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis high eviction rate"
+          description: "Redis is evicting {{ $value | humanize }} keys per second"
+          runbook_url: "https://runbooks.teamone.local/redis-high-eviction"
+
+  # ═══════════════════════════════════════════════════════════════════
+  # Kafka Alerts
+  # ═══════════════════════════════════════════════════════════════════
+  - name: kafka
+    interval: 30s
+    rules:
+      - alert: KafkaBrokerDown
+        expr: |
+          kafka_brokers
+          -
+          count(kafka_broker_info) by (cluster_id)
+          > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Kafka broker down"
+          description: "Kafka cluster has {{ $value }} broker(s) down"
+          runbook_url: "https://runbooks.teamone.local/kafka-broker-down"
+
+      - alert: KafkaUnderReplicatedPartitions
+        expr: |
+          sum(kafka_topic_partition_under_replicated_partition)
+          > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Kafka under-replicated partitions"
+          description: "Kafka has {{ $value }} under-replicated partitions"
+          runbook_url: "https://runbooks.teamone.local/kafka-under-replicated"
+
+      - alert: KafkaConsumerLag
+        expr: |
+          sum(kafka_consumer_group_lag) by (consumer_group)
+          > 10000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Kafka consumer lag"
+          description: "Consumer group {{ $labels.consumer_group }} has lag of {{ $value }}"
+          runbook_url: "https://runbooks.teamone.local/kafka-consumer-lag"
+
+  # ═══════════════════════════════════════════════════════════════════
+  # Application Alerts
+  # ═══════════════════════════════════════════════════════════════════
+  - name: application
+    interval: 30s
+    rules:
+      - alert: HighCPUUsage
+        expr: |
+          avg(rate(container_cpu_usage_seconds_total{container_name=~"teamone-.*"}[5m])) by (container_name)
+          /
+          container_spec_cpu_quota{container_name=~"teamone-.*"}
+          * 100
+          > 80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage for {{ $labels.container_name }}"
+          description: "Container {{ $labels.container_name }} CPU usage is {{ $value | humanize }}%"
+          runbook_url: "https://runbooks.teamone.local/high-cpu"
+
+      - alert: HighMemoryUsage
+        expr: |
+          container_memory_usage_bytes{container_name=~"teamone-.*"}
+          /
+          container_spec_memory_limit_bytes{container_name=~"teamone-.*"}
+          * 100
+          > 80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage for {{ $labels.container_name }}"
+          description: "Container {{ $labels.container_name }} memory usage is {{ $value | humanize }}%"
+          runbook_url: "https://runbooks.teamone.local/high-memory"
+
+      - alert: ContainerRestarting
+        expr: |
+          increase(container_last_seen{container_name=~"teamone-.*"}[5m])
+          > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container restarting frequently"
+          description: "Container {{ $labels.container_name }} has restarted {{ $value }} times in 5 minutes"
+          runbook_url: "https://runbooks.teamone.local/container-restarting"
+
+  # ═══════════════════════════════════════════════════════════════════
+  # Security Alerts
+  # ═══════════════════════════════════════════════════════════════════
+  - name: security
+    interval: 30s
+    rules:
+      - alert: HighFailedLoginAttempts
+        expr: |
+          sum(rate(auth_login_failures_total[5m])) by (user)
+          > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High failed login attempts for user {{ $labels.user }}"
+          description: "User {{ $labels.user }} has {{ $value | humanize }} failed login attempts per second"
+          runbook_url: "https://runbooks.teamone.local/failed-logins"
+
+      - alert: PossibleBruteForceAttack
+        expr: |
+          sum(rate(auth_login_failures_total{ip=~".+"}[5m])) by (ip)
+          > 20
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Possible brute force attack from {{ $labels.ip }}"
+          description: "IP {{ $labels.ip }} has {{ $value | humanize }} failed login attempts per second"
+          runbook_url: "https://runbooks.teamone.local/brute-force"
+
+      - alert: High401Errors
+        expr: |
+          sum(rate(http_requests_total{status="401"}[5m]))
+          > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High 401 error rate"
+          description: "System has {{ $value | humanize }} 401 errors per second"
+          runbook_url: "https://runbooks.teamone.local/high-401-errors"
+
+  # ═══════════════════════════════════════════════════════════════════
+  # Business Metrics Alerts
+  # ═══════════════════════════════════════════════════════════════════
+  - name: business_metrics
+    interval: 1m
+    rules:
+      - alert: LowProjectCreationRate
+        expr: |
+          sum(rate(projects_created_total[1h]))
+          < 1
+        for: 24h
+        labels:
+          severity: info
+        annotations:
+          summary: "Low project creation rate"
+          description: "Less than 1 project created in the last 24 hours"
+          runbook_url: "https://runbooks.teamone.local/low-project-creation"
+
+      - alert: HighTicketVolume
+        expr: |
+          sum(rate(tickets_created_total[1h]))
+          > 100
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "High ticket volume"
+          description: "{{ $value | humanize }} tickets created in the last hour"
+          runbook_url: "https://runbooks.teamone.local/high-ticket-volume"
+
+      - alert: InvoicePaymentDelay
+        expr: |
+          avg(invoice_payment_delay_seconds)
+          > 604800
+        for: 24h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Invoice payment delays"
+          description: "Average invoice payment delay is {{ $value | humanizeDuration }}"
+          runbook_url: "https://runbooks.teamone.local/payment-delays"
+
+  # ═══════════════════════════════════════════════════════════════════
+  # Backup Alerts
+  # ═══════════════════════════════════════════════════════════════════
+  - name: backup
+    interval: 1h
+    rules:
+      - alert: BackupFailed
+        expr: |
+          backup_last_success_timestamp_seconds
+          <
+          (time() - 86400)
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backup failed"
+          description: "Last successful backup was more than 24 hours ago"
+          runbook_url: "https://runbooks.teamone.local/backup-failed"
+
+      - alert: BackupStorageLow
+        expr: |
+          backup_storage_used_bytes
+          /
+          backup_storage_total_bytes
+          * 100
+          > 80
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Backup storage low"
+          description: "Backup storage is {{ $value | humanize }}% full"
+          runbook_url: "https://runbooks.teamone.local/backup-storage-low"

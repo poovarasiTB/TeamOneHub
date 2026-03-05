@@ -1,0 +1,543 @@
+# ═══════════════════════════════════════════════════════════════════
+# TEAMONE - Complete Development Environment
+# ═══════════════════════════════════════════════════════════════════
+
+services:
+  # ─────────────────────────────────────────────────────────────────
+  # Reverse Proxy & SSL
+  # ─────────────────────────────────────────────────────────────────
+  traefik:
+    image: traefik:v3.0
+    container_name: teamone-traefik
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--accesslog=true"
+      - "--accesslog.filepath=/var/log/traefik/access.log"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"  # Traefik dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik:/etc/traefik
+      - traefik-certs:/letsencrypt
+    networks:
+      - teamone-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dashboard.rule=Host(`traefik.localhost`)"
+      - "traefik.http.routers.dashboard.service=api@internal"
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────────────────────────
+  # API Gateway
+  # ─────────────────────────────────────────────────────────────────
+  api-gateway:
+    build:
+      context: ./backend/api-gateway
+      dockerfile: Dockerfile
+    container_name: teamone-api-gateway
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - LOG_LEVEL=debug
+      - AUTH_SERVICE_URL=http://auth-service:3002
+      - PEOPLE_SERVICE_URL=http://people-service:3003
+      - WORK_SERVICE_URL=http://work-service:3004
+      - REDIS_URL=redis://redis:6379
+      - RATE_LIMIT_WINDOW_MS=60000
+      - RATE_LIMIT_MAX_REQUESTS=100
+    ports:
+      - "3001:3001"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - teamone-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api.rule=Host(`api.localhost`)"
+      - "traefik.http.services.api.loadbalancer.server.port=3001"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─────────────────────────────────────────────────────────────────
+  # Authentication Service
+  # ─────────────────────────────────────────────────────────────────
+  auth-service:
+    build:
+      context: ./backend/services/auth
+      dockerfile: Dockerfile
+    container_name: teamone-auth
+    environment:
+      - NODE_ENV=development
+      - PORT=3002
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/teamone
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=dev-secret-key-change-in-production
+      - JWT_EXPIRY=15m
+      - REFRESH_TOKEN_SECRET=dev-refresh-secret-change-in-production
+      - REFRESH_TOKEN_EXPIRY=7d
+      - GOOGLE_OAUTH_CLIENT_ID=${GOOGLE_OAUTH_CLIENT_ID:-}
+      - GOOGLE_OAUTH_CLIENT_SECRET=${GOOGLE_OAUTH_CLIENT_SECRET:-}
+    ports:
+      - "3002:3002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - teamone-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─────────────────────────────────────────────────────────────────
+  # People Service
+  # ─────────────────────────────────────────────────────────────────
+  people-service:
+    build:
+      context: ./backend/services/people
+      dockerfile: Dockerfile
+    container_name: teamone-people
+    environment:
+      - NODE_ENV=development
+      - PORT=3003
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/teamone
+      - REDIS_URL=redis://redis:6379
+      - KAFKA_BROKERS=kafka:9092
+    ports:
+      - "3003:3003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - teamone-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─────────────────────────────────────────────────────────────────
+  # Work Service
+  # ─────────────────────────────────────────────────────────────────
+  work-service:
+    build:
+      context: ./backend/services/work
+      dockerfile: Dockerfile
+    container_name: teamone-work
+    environment:
+      - NODE_ENV=development
+      - PORT=3004
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/teamone
+      - REDIS_URL=redis://redis:6379
+      - KAFKA_BROKERS=kafka:9092
+    ports:
+      - "3004:3004"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - teamone-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─────────────────────────────────────────────────────────────────
+  # Money Service
+  # ─────────────────────────────────────────────────────────────────
+  money-service:
+    build:
+      context: ./backend/services/money
+      dockerfile: Dockerfile
+    container_name: teamone-money
+    environment:
+      - NODE_ENV=development
+      - PORT=3005
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/teamone
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "3005:3005"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - teamone-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3005/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─────────────────────────────────────────────────────────────────
+  # Assets Service
+  # ─────────────────────────────────────────────────────────────────
+  assets-service:
+    build:
+      context: ./backend/services/assets
+      dockerfile: Dockerfile
+    container_name: teamone-assets
+    environment:
+      - NODE_ENV=development
+      - PORT=3006
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/teamone
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "3006:3006"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - teamone-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3006/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─────────────────────────────────────────────────────────────────
+  # Support Service
+  # ─────────────────────────────────────────────────────────────────
+  support-service:
+    build:
+      context: ./backend/services/support
+      dockerfile: Dockerfile
+    container_name: teamone-support
+    environment:
+      - NODE_ENV=development
+      - PORT=3007
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/teamone
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "3007:3007"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - teamone-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3007/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─────────────────────────────────────────────────────────────────
+  # Growth Service
+  # ─────────────────────────────────────────────────────────────────
+  growth-service:
+    build:
+      context: ./backend/services/growth
+      dockerfile: Dockerfile
+    container_name: teamone-growth
+    environment:
+      - NODE_ENV=development
+      - PORT=3008
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/teamone
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "3008:3008"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - teamone-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3008/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─────────────────────────────────────────────────────────────────
+  # Frontend PWA
+  # ─────────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - NODE_ENV=development
+        - VITE_API_URL=http://localhost:3001
+        - VITE_WS_URL=ws://localhost:3001
+    container_name: teamone-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - api-gateway
+    networks:
+      - teamone-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`localhost`)"
+      - "traefik.http.services.frontend.loadbalancer.server.port=80"
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────────────────────────
+  # PostgreSQL (Primary Database)
+  # ─────────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: teamone-postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=teamone
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./database/init-scripts:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    networks:
+      - teamone-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────────────────────────────
+  # MongoDB (Document Store)
+  # ─────────────────────────────────────────────────────────────────
+  mongo:
+    image: mongo:7
+    container_name: teamone-mongo
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=mongo
+      - MONGO_INITDB_ROOT_PASSWORD=mongo
+    volumes:
+      - mongo-data:/data/db
+    ports:
+      - "27017:27017"
+    networks:
+      - teamone-network
+    restart: unless-stopped
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────────────────────────────
+  # Redis (Cache & Sessions)
+  # ─────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: teamone-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - teamone-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────────────────────────────
+  # Apache Kafka (Event Streaming)
+  # ─────────────────────────────────────────────────────────────────
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: teamone-kafka
+    environment:
+      - KAFKA_BROKER_ID=1
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
+      - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - teamone-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: teamone-zookeeper
+    environment:
+      - ZOOKEEPER_CLIENT_PORT=2181
+      - ZOOKEEPER_TICK_TIME=2000
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+    networks:
+      - teamone-network
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────────────────────────
+  # Elasticsearch (Search & Analytics)
+  # ─────────────────────────────────────────────────────────────────
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
+    container_name: teamone-es
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    networks:
+      - teamone-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ─────────────────────────────────────────────────────────────────
+  # MinIO (S3-Compatible Object Storage)
+  # ─────────────────────────────────────────────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: teamone-minio
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    volumes:
+      - minio-data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks:
+      - teamone-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─────────────────────────────────────────────────────────────────
+  # Adminer (Database Management UI)
+  # ─────────────────────────────────────────────────────────────────
+  adminer:
+    image: adminer:latest
+    container_name: teamone-adminer
+    environment:
+      - ADMINER_DEFAULT_SERVER=postgres
+    ports:
+      - "8081:8080"
+    depends_on:
+      - postgres
+    networks:
+      - teamone-network
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.adminer.rule=Host(`db.localhost`)"
+      - "traefik.http.services.adminer.loadbalancer.server.port=8080"
+
+  # ─────────────────────────────────────────────────────────────────
+  # Prometheus (Metrics Collection)
+  # ─────────────────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: teamone-prometheus
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    networks:
+      - teamone-network
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────────────────────────
+  # Grafana (Metrics Dashboard)
+  # ─────────────────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: teamone-grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    ports:
+      - "3100:3100"
+    depends_on:
+      - prometheus
+    networks:
+      - teamone-network
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.localhost`)"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3100"
+
+# ═══════════════════════════════════════════════════════════════════
+# Networks
+# ═══════════════════════════════════════════════════════════════════
+networks:
+  teamone-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+# ═══════════════════════════════════════════════════════════════════
+# Volumes
+# ═══════════════════════════════════════════════════════════════════
+volumes:
+  postgres-data:
+  mongo-data:
+  redis-data:
+  kafka-data:
+  zookeeper-data:
+  minio-data:
+  elasticsearch-data:
+  grafana-data:
+  prometheus-data:
+  traefik-certs:

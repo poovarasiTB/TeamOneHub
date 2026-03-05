@@ -1,0 +1,100 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Brand Colors */
+  --color-primary-900: #1e3a5f;
+  --color-primary-800: #2d5a87;
+  --color-primary-700: #3d7ab0;
+  --color-primary-600: #4d9ad9;
+  --color-primary-500: #7eb8da;
+  --color-primary-400: #b3d4ea;
+  
+  /* Background */
+  --color-bg-950: #0a0a14;
+  --color-bg-900: #0f0f23;
+  --color-bg-800: #16162f;
+  --color-bg-700: #1e1e3f;
+  --color-bg-600: #2a2a4f;
+  
+  /* Surface */
+  --color-surface-800: #1a1a3e;
+  --color-surface-750: #25254a;
+  --color-surface-700: #303057;
+  
+  /* Text */
+  --color-text-100: #ffffff;
+  --color-text-80: #e8e8e8;
+  --color-text-60: #c4c4c4;
+  --color-text-40: #9a9a9a;
+  --color-text-30: #6b6b6b;
+  
+  /* Border */
+  --color-border-12: rgba(255, 255, 255, 0.12);
+  --color-border-20: rgba(255, 255, 255, 0.20);
+  
+  /* Semantic */
+  --color-success: #4ecdc4;
+  --color-warning: #ffd93d;
+  --color-error: #ff6b8a;
+  --color-info: #6ba3d9;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background-color: var(--color-bg-900);
+  color: var(--color-text-80);
+  line-height: 1.6;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-800);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-20);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-30);
+}
+
+/* Focus */
+:focus-visible {
+  outline: 2px solid var(--color-primary-500);
+  outline-offset: 2px;
+}
+
+/* Utility Classes */
+@layer utilities {
+  .text-gradient {
+    background: linear-gradient(135deg, var(--color-primary-600), var(--color-primary-400));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  .glass {
+    background: rgba(26, 26, 62, 0.7);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+}
