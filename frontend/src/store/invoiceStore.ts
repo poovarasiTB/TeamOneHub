@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import apiClient from '../lib/api';
+import { apiClient } from '@/lib/api';
 
 interface Invoice {
   id: string;
@@ -14,6 +14,7 @@ interface Invoice {
   issuedDate: string;
   paidAt?: string;
   createdAt: string;
+  items?: any[];
 }
 
 interface InvoiceState {
@@ -27,7 +28,7 @@ interface InvoiceState {
     total: number;
     totalPages: number;
   };
-  
+
   fetchInvoices: (filters?: any) => Promise<void>;
   fetchInvoice: (id: string) => Promise<void>;
   createInvoice: (data: Partial<Invoice>) => Promise<void>;
@@ -53,11 +54,11 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => ({
 
   fetchInvoices: async (filters?: any) => {
     set({ isLoading: true, error: null });
-    
+
     try {
       const response = await apiClient.get('/money/invoices', { params: filters });
       const { data, pagination } = response.data;
-      
+
       set({
         invoices: data,
         pagination,
@@ -73,7 +74,7 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => ({
 
   fetchInvoice: async (id: string) => {
     set({ isLoading: true, error: null });
-    
+
     try {
       const response = await apiClient.get(`/money/invoices/${id}`);
       set({
@@ -90,11 +91,11 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => ({
 
   createInvoice: async (data: Partial<Invoice>) => {
     set({ isLoading: true, error: null });
-    
+
     try {
       const response = await apiClient.post('/money/invoices', data);
       const newInvoice = response.data;
-      
+
       set((state) => ({
         invoices: [newInvoice, ...state.invoices],
         currentInvoice: newInvoice,
@@ -111,11 +112,11 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => ({
 
   updateInvoice: async (id: string, data: Partial<Invoice>) => {
     set({ isLoading: true, error: null });
-    
+
     try {
       const response = await apiClient.patch(`/money/invoices/${id}`, data);
       const updatedInvoice = response.data;
-      
+
       set((state) => ({
         invoices: state.invoices.map((i) => (i.id === id ? updatedInvoice : i)),
         currentInvoice: updatedInvoice,
@@ -132,10 +133,10 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => ({
 
   deleteInvoice: async (id: string) => {
     set({ isLoading: true, error: null });
-    
+
     try {
       await apiClient.delete(`/money/invoices/${id}`);
-      
+
       set((state) => ({
         invoices: state.invoices.filter((i) => i.id !== id),
         currentInvoice: state.currentInvoice?.id === id ? null : state.currentInvoice,
@@ -152,10 +153,10 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => ({
 
   sendInvoice: async (id: string) => {
     set({ isLoading: true, error: null });
-    
+
     try {
       await apiClient.post(`/money/invoices/${id}/send`);
-      
+
       set((state) => ({
         invoices: state.invoices.map((i) =>
           i.id === id ? { ...i, status: 'sent' as const } : i
@@ -173,10 +174,10 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => ({
 
   recordPayment: async (id: string, data: any) => {
     set({ isLoading: true, error: null });
-    
+
     try {
       await apiClient.post(`/money/invoices/${id}/payment`, data);
-      
+
       set((state) => ({
         invoices: state.invoices.map((i) =>
           i.id === id ? { ...i, status: 'paid' as const } : i

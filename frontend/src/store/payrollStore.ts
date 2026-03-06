@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import apiClient from '../lib/api';
+import { apiClient } from '@/lib/api';
 
 export interface PayrollRecord {
   id: string;
@@ -112,7 +112,7 @@ export const usePayrollStore = create<PayrollState>((set, get) => ({
 
   approvePayroll: async (id: string) => {
     try {
-      const response = await apiClient.post(`/people/payroll/${id}/approve`);
+      const response = await apiClient.post(`/people/payroll/${id}/process`);
       const updatedRecord = response.data;
       set((state) => ({
         records: state.records.map((r) => (r.id === id ? updatedRecord : r)),
@@ -125,7 +125,7 @@ export const usePayrollStore = create<PayrollState>((set, get) => ({
 
   markPaid: async (id: string) => {
     try {
-      const response = await apiClient.post(`/people/payroll/${id}/mark-paid`);
+      const response = await apiClient.post(`/people/payroll/${id}/pay`);
       const updatedRecord = response.data;
       set((state) => ({
         records: state.records.map((r) => (r.id === id ? updatedRecord : r)),

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import apiClient from '../lib/api';
+import { apiClient } from '@/lib/api';
 
 interface Ticket {
   id: string;
@@ -29,7 +29,7 @@ interface TicketState {
     total: number;
     totalPages: number;
   };
-  
+
   fetchTickets: (filters?: any) => Promise<void>;
   fetchTicket: (id: string) => Promise<void>;
   createTicket: (data: Partial<Ticket>) => Promise<void>;
@@ -55,11 +55,11 @@ export const useTicketStore = create<TicketState>((set, get) => ({
 
   fetchTickets: async (filters?: any) => {
     set({ isLoading: true, error: null });
-    
+
     try {
       const response = await apiClient.get('/support/tickets', { params: filters });
       const { data, pagination } = response.data;
-      
+
       set({
         tickets: data,
         pagination,
@@ -75,7 +75,7 @@ export const useTicketStore = create<TicketState>((set, get) => ({
 
   fetchTicket: async (id: string) => {
     set({ isLoading: true, error: null });
-    
+
     try {
       const response = await apiClient.get(`/support/tickets/${id}`);
       set({
@@ -92,11 +92,11 @@ export const useTicketStore = create<TicketState>((set, get) => ({
 
   createTicket: async (data: Partial<Ticket>) => {
     set({ isLoading: true, error: null });
-    
+
     try {
       const response = await apiClient.post('/support/tickets', data);
       const newTicket = response.data;
-      
+
       set((state) => ({
         tickets: [newTicket, ...state.tickets],
         currentTicket: newTicket,
@@ -113,11 +113,11 @@ export const useTicketStore = create<TicketState>((set, get) => ({
 
   updateTicket: async (id: string, data: Partial<Ticket>) => {
     set({ isLoading: true, error: null });
-    
+
     try {
       const response = await apiClient.patch(`/support/tickets/${id}`, data);
       const updatedTicket = response.data;
-      
+
       set((state) => ({
         tickets: state.tickets.map((t) => (t.id === id ? updatedTicket : t)),
         currentTicket: updatedTicket,
@@ -134,10 +134,10 @@ export const useTicketStore = create<TicketState>((set, get) => ({
 
   deleteTicket: async (id: string) => {
     set({ isLoading: true, error: null });
-    
+
     try {
       await apiClient.delete(`/support/tickets/${id}`);
-      
+
       set((state) => ({
         tickets: state.tickets.filter((t) => t.id !== id),
         currentTicket: state.currentTicket?.id === id ? null : state.currentTicket,
@@ -154,13 +154,13 @@ export const useTicketStore = create<TicketState>((set, get) => ({
 
   addComment: async (ticketId: string, content: string) => {
     set({ isLoading: true, error: null });
-    
+
     try {
       await apiClient.post(`/support/tickets/${ticketId}/comment`, {
         content,
         commentType: 'public',
       });
-      
+
       set({ isLoading: false });
     } catch (error: any) {
       set({
@@ -173,10 +173,10 @@ export const useTicketStore = create<TicketState>((set, get) => ({
 
   assignTicket: async (ticketId: string, assigneeId: string) => {
     set({ isLoading: true, error: null });
-    
+
     try {
       await apiClient.post(`/support/tickets/${ticketId}/assign`, { assigneeId });
-      
+
       set((state) => ({
         tickets: state.tickets.map((t) =>
           t.id === ticketId ? { ...t, assigneeId, status: 'open' as const } : t

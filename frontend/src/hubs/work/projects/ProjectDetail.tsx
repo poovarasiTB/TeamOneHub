@@ -46,7 +46,7 @@ export function ProjectDetail() {
             <span className="text-text-400 font-mono">{currentProject.code}</span>
             <Badge variant={
               currentProject.status === 'active' ? 'success' :
-              currentProject.status === 'completed' ? 'info' : 'default'
+                currentProject.status === 'completed' ? 'info' : 'default'
             }>
               {currentProject.status}
             </Badge>
@@ -73,7 +73,7 @@ export function ProjectDetail() {
             <p className="text-sm text-text-400 mb-1">Health Status</p>
             <Badge variant={
               currentProject.healthStatus === 'green' ? 'success' :
-              currentProject.healthStatus === 'yellow' ? 'warning' : 'error'
+                currentProject.healthStatus === 'yellow' ? 'warning' : 'error'
             }>
               {currentProject.healthStatus}
             </Badge>
@@ -106,7 +106,7 @@ export function ProjectDetail() {
           <h2 className="text-xl font-semibold text-text-100">Project Details</h2>
         </CardHeader>
         <CardContent>
-          <dl className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <dl className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <dt className="text-sm text-text-400 mb-1">Project Type</dt>
               <dd className="text-text-100 capitalize">{currentProject.type}</dd>
@@ -125,38 +125,57 @@ export function ProjectDetail() {
                 <dd className="text-text-100">{new Date(currentProject.endDate).toLocaleDateString()}</dd>
               </div>
             )}
+            <div>
+              <dt className="text-sm text-text-400 mb-1">Industry</dt>
+              <dd className="text-text-100 capitalize">{(currentProject as any).industryTemplate || 'N/A'}</dd>
+            </div>
+            <div>
+              <dt className="text-sm text-text-400 mb-1">Data Classification</dt>
+              <dd className="text-text-100 capitalize">
+                <Badge variant={(currentProject as any).dataClassification === 'public' ? 'success' : 'warning'}>
+                  {(currentProject as any).dataClassification || 'Internal'}
+                </Badge>
+              </dd>
+            </div>
           </dl>
         </CardContent>
       </Card>
 
       {/* Quick Links */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Link to={`/work/projects/${id}/tasks`}>
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Link to={`/work/projects/${id}/board`}>
+          <Card className="hover:shadow-lg transition-transform hover:-translate-y-1 cursor-pointer bg-gradient-to-br from-bg-800 to-bg-900 border-border-12">
             <CardContent className="p-6 text-center">
-              <div className="text-3xl mb-3">📋</div>
-              <h3 className="text-lg font-semibold text-text-100">Tasks</h3>
-              <p className="text-sm text-text-400 mt-1">View all tasks</p>
+              <div className="text-4xl mb-3 drop-shadow-md">📋</div>
+              <h3 className="text-lg font-bold text-text-100">Agile Board</h3>
+              <p className="text-sm text-text-400 mt-1">Kanban & Scrum</p>
             </CardContent>
           </Card>
         </Link>
-
+        <Link to={`/work/projects/${id}/gantt`}>
+          <Card className="hover:shadow-lg transition-transform hover:-translate-y-1 cursor-pointer bg-gradient-to-br from-bg-800 to-bg-900 border-border-12">
+            <CardContent className="p-6 text-center">
+              <div className="text-4xl mb-3 drop-shadow-md">📈</div>
+              <h3 className="text-lg font-bold text-text-100">Timeline</h3>
+              <p className="text-sm text-text-400 mt-1">Interactive Gantt</p>
+            </CardContent>
+          </Card>
+        </Link>
         <Link to={`/work/projects/${id}/whiteboard`}>
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+          <Card className="hover:shadow-lg transition-transform hover:-translate-y-1 cursor-pointer bg-gradient-to-br from-bg-800 to-bg-900 border-border-12">
             <CardContent className="p-6 text-center">
-              <div className="text-3xl mb-3">🎨</div>
-              <h3 className="text-lg font-semibold text-text-100">Whiteboard</h3>
-              <p className="text-sm text-text-400 mt-1">Collaborate visually</p>
+              <div className="text-4xl mb-3 drop-shadow-md">🎨</div>
+              <h3 className="text-lg font-bold text-text-100">Whiteboard</h3>
+              <p className="text-sm text-text-400 mt-1">Design visually</p>
             </CardContent>
           </Card>
         </Link>
-
         <Link to={`/work/projects/${id}/reports`}>
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+          <Card className="hover:shadow-lg transition-transform hover:-translate-y-1 cursor-pointer bg-gradient-to-br from-bg-800 to-bg-900 border-border-12">
             <CardContent className="p-6 text-center">
-              <div className="text-3xl mb-3">📊</div>
-              <h3 className="text-lg font-semibold text-text-100">Reports</h3>
-              <p className="text-sm text-text-400 mt-1">View analytics</p>
+              <div className="text-4xl mb-3 drop-shadow-md">📊</div>
+              <h3 className="text-lg font-bold text-text-100">Analytics</h3>
+              <p className="text-sm text-text-400 mt-1">Project Reports</p>
             </CardContent>
           </Card>
         </Link>

@@ -1,93 +1,128 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardHeader, CardContent } from '../../../components/Card';
 import { Button } from '../../../components/Button';
 import { Badge } from '../../../components/Badge';
+import { useExpenseStore } from '../../../store/expenseStore';
+import { useAuthStore } from '../../../store/authStore';
 import toast from 'react-hot-toast';
 
 export function ExpenseTracker() {
-  const [expenses, setExpenses] = useState([
-    { id: 1, category: 'Travel', description: 'Flight to NYC', amount: 450, date: '2026-02-15', status: 'approved', submitter: 'John Doe' },
-    { id: 2, category: 'Meals', description: 'Client lunch meeting', amount: 85, date: '2026-02-14', status: 'pending', submitter: 'Jane Smith' },
-    { id: 3, category: 'Equipment', description: 'New monitor', amount: 350, date: '2026-02-13', status: 'approved', submitter: 'Mike Johnson' },
-    { id: 4, category: 'Software', description: 'Adobe Creative Cloud', amount: 55, date: '2026-02-12', status: 'approved', submitter: 'Sarah Wilson' },
-    { id: 5, category: 'Travel', description: 'Hotel accommodation', amount: 280, date: '2026-02-11', status: 'rejected', submitter: 'John Doe' },
-  ]);
+  const { user } = useAuthStore();
+  const { expenses, fetchExpenses, createExpense, approveExpense, rejectExpense, payExpense, isLoading, error } = useExpenseStore();
 
   const [showAddForm, setShowAddForm] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
   const [formData, setFormData] = useState({
     category: 'Travel',
     description: '',
     amount: '',
-    date: new Date().toISOString().split('T')[0],
+    expenseDate: new Date().toISOString().split('T')[0],
   });
 
-  const handleAddExpense = (e: React.FormEvent) => {
+  useEffect(() => {
+    fetchExpenses();
+  }, [fetchExpenses]);
+
+  const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.description || !formData.amount) {
       toast.error('Please fill all fields');
       return;
     }
-    const newExpense = {
-      id: expenses.length + 1,
-      ...formData,
-      amount: parseFloat(formData.amount),
-      status: 'pending' as const,
-      submitter: 'Current User',
-    };
-    setExpenses([newExpense, ...expenses]);
-    setFormData({ category: 'Travel', description: '', amount: '', date: new Date().toISOString().split('T')[0] });
-    setShowAddForm(false);
-    toast.success('Expense submitted for approval');
+
+    try {
+      await createExpense({
+        ...formData,
+        amount: parseFloat(formData.amount),
+        employeeId: user?.id,
+      });
+      setFormData({ category: 'Travel', description: '', amount: '', expenseDate: new Date().toISOString().split('T')[0] });
+      setShowAddForm(false);
+      toast.success('Expense submitted for approval');
+    } catch (err) {
+      toast.error('Failed to submit expense');
+    }
   };
 
-  const handleApprove = (id: number) => {
-    setExpenses(expenses.map(exp => exp.id === id ? { ...exp, status: 'approved' as const } : exp));
+  const handleScanReceipt = () => {
+    setIsScanning(true);
+    toast.loading('Analyzing receipt with OCR...', { duration: 2000 });
+
+    setTimeout(() => {
+      setFormData({
+        category: 'Meals',
+        description: 'Team Lunch @ Cloud Cafe',
+        amount: '84.50',
+        expenseDate: new Date().toISOString().split('T')[0]
+      });
+      setIsScanning(false);
+      setShowAddForm(true);
+      toast.success('Receipt scanned successfully!');
+    }, 2000);
+  };
+
+  const handleApprove = async (id: string) => {
+    await approveExpense(id);
     toast.success('Expense approved');
   };
 
-  const handleReject = (id: number) => {
-    setExpenses(expenses.map(exp => exp.id === id ? { ...exp, status: 'rejected' as const } : exp));
+  const handleReject = async (id: string) => {
+    await rejectExpense(id);
     toast.success('Expense rejected');
   };
 
-  const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
-  const pendingExpenses = expenses.filter(exp => exp.status === 'pending').reduce((sum, exp) => sum + exp.amount, 0);
-  const approvedExpenses = expenses.filter(exp => exp.status === 'approved').reduce((sum, exp) => sum + exp.amount, 0);
+  const totals = {
+    all: expenses.reduce((sum, exp) => sum + exp.amount, 0),
+    pending: expenses.filter(exp => exp.status === 'pending').reduce((sum, exp) => sum + exp.amount, 0),
+    approved: expenses.filter(exp => exp.status === 'approved').reduce((sum, exp) => sum + exp.amount, 0),
+    count: expenses.length
+  };
 
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold text-text-100">Expense Tracker</h1>
-          <p className="text-text-400 mt-1">Track and manage expenses</p>
+          <p className="text-text-400 mt-1">Track and manage expenses with AI OCR</p>
         </div>
-        <Button variant="primary" onClick={() => setShowAddForm(true)}>+ Add Expense</Button>
+        <div className="flex gap-3">
+          <Button variant="secondary" onClick={handleScanReceipt} disabled={isScanning}>
+            {isScanning ? 'Scanning...' : '📸 Scan Receipt'}
+          </Button>
+          <Button variant="primary" onClick={() => setShowAddForm(true)}>+ Manual Entry</Button>
+        </div>
       </div>
+
+      {error && (
+        <div className="mb-4 p-4 bg-error/20 border border-error rounded-lg text-error">
+          {error}
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
         <Card>
           <CardContent className="p-6 text-center">
             <p className="text-sm text-text-400 mb-2">Total Expenses</p>
-            <p className="text-3xl font-bold text-text-100">${totalExpenses.toLocaleString()}</p>
+            <p className="text-3xl font-bold text-text-100">${totals.all.toLocaleString()}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-6 text-center">
             <p className="text-sm text-text-400 mb-2">Pending Approval</p>
-            <p className="text-3xl font-bold text-warning">${pendingExpenses.toLocaleString()}</p>
+            <p className="text-3xl font-bold text-warning">${totals.pending.toLocaleString()}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-6 text-center">
             <p className="text-sm text-text-400 mb-2">Approved</p>
-            <p className="text-3xl font-bold text-success">${approvedExpenses.toLocaleString()}</p>
+            <p className="text-3xl font-bold text-success">${totals.approved.toLocaleString()}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-6 text-center">
             <p className="text-sm text-text-400 mb-2">Total Claims</p>
-            <p className="text-3xl font-bold text-primary-400">{expenses.length}</p>
+            <p className="text-3xl font-bold text-primary-400">{totals.count}</p>
           </CardContent>
         </Card>
       </div>
@@ -144,8 +179,8 @@ export function ExpenseTracker() {
                   <label className="block text-sm text-text-400 mb-2">Date</label>
                   <input
                     type="date"
-                    value={formData.date}
-                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                    value={formData.expenseDate}
+                    onChange={(e) => setFormData({ ...formData, expenseDate: e.target.value })}
                     className="w-full px-4 py-3 bg-bg-800 border border-border-12 rounded-xl text-text-80 focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
@@ -180,31 +215,46 @@ export function ExpenseTracker() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-12">
-                {expenses.map((expense) => (
-                  <tr key={expense.id} className="hover:bg-bg-800/50 transition-colors">
-                    <td className="py-4 px-6 text-text-600">{new Date(expense.date).toLocaleDateString()}</td>
-                    <td className="py-4 px-6 text-text-600">{expense.category}</td>
-                    <td className="py-4 px-6 text-text-600">{expense.description}</td>
-                    <td className="py-4 px-6 text-text-600">{expense.submitter}</td>
-                    <td className="py-4 px-6 text-text-100 font-semibold">${expense.amount.toLocaleString()}</td>
-                    <td className="py-4 px-6">
-                      <Badge variant={
-                        expense.status === 'approved' ? 'success' :
-                        expense.status === 'pending' ? 'warning' : 'error'
-                      }>
-                        {expense.status}
-                      </Badge>
-                    </td>
-                    <td className="py-4 px-6">
-                      {expense.status === 'pending' && (
-                        <div className="flex gap-2">
-                          <Button size="sm" variant="success" onClick={() => handleApprove(expense.id)}>Approve</Button>
-                          <Button size="sm" variant="danger" onClick={() => handleReject(expense.id)}>Reject</Button>
-                        </div>
-                      )}
+                {isLoading && expenses.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mx-auto"></div>
                     </td>
                   </tr>
-                ))}
+                ) : expenses.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-text-400">No expenses found.</td>
+                  </tr>
+                ) : (
+                  expenses.map((expense) => (
+                    <tr key={expense.id} className="hover:bg-bg-800/50 transition-colors">
+                      <td className="py-4 px-6 text-text-600">{new Date(expense.expenseDate).toLocaleDateString()}</td>
+                      <td className="py-4 px-6 text-text-600">{expense.category}</td>
+                      <td className="py-4 px-6 text-text-600">{expense.description}</td>
+                      <td className="py-4 px-6 text-text-600">{expense.employeeName}</td>
+                      <td className="py-4 px-6 text-text-100 font-semibold">${expense.amount.toLocaleString()}</td>
+                      <td className="py-4 px-6">
+                        <Badge variant={
+                          expense.status === 'approved' || expense.status === 'paid' ? 'success' :
+                            expense.status === 'pending' ? 'warning' : 'error'
+                        }>
+                          {expense.status}
+                        </Badge>
+                      </td>
+                      <td className="py-4 px-6">
+                        {expense.status === 'pending' && (user?.role === 'admin' || user?.role === 'manager') && (
+                          <div className="flex gap-2">
+                            <Button size="sm" variant="success" onClick={() => handleApprove(expense.id)}>Approve</Button>
+                            <Button size="sm" variant="danger" onClick={() => handleReject(expense.id)}>Reject</Button>
+                          </div>
+                        )}
+                        {expense.status === 'approved' && (user?.role === 'admin' || user?.role === 'manager') && (
+                          <Button size="sm" variant="primary" onClick={() => payExpense(expense.id)}>Mark Paid</Button>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

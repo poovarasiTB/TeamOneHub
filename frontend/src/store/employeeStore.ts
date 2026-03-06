@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import apiClient from '../lib/api';
+import { apiClient } from '@/lib/api';
 
 interface Employee {
   id: string;
@@ -29,7 +29,7 @@ interface EmployeeState {
     total: number;
     totalPages: number;
   };
-  
+
   fetchEmployees: (filters?: any) => Promise<void>;
   fetchEmployee: (id: string) => Promise<void>;
   createEmployee: (data: Partial<Employee>) => Promise<void>;
@@ -53,11 +53,11 @@ export const useEmployeeStore = create<EmployeeState>((set, get) => ({
 
   fetchEmployees: async (filters?: any) => {
     set({ isLoading: true, error: null });
-    
+
     try {
       const response = await apiClient.get('/people/employees', { params: filters });
       const { data, pagination } = response.data;
-      
+
       set({
         employees: data,
         pagination,
@@ -73,7 +73,7 @@ export const useEmployeeStore = create<EmployeeState>((set, get) => ({
 
   fetchEmployee: async (id: string) => {
     set({ isLoading: true, error: null });
-    
+
     try {
       const response = await apiClient.get(`/people/employees/${id}`);
       set({
@@ -90,11 +90,11 @@ export const useEmployeeStore = create<EmployeeState>((set, get) => ({
 
   createEmployee: async (data: Partial<Employee>) => {
     set({ isLoading: true, error: null });
-    
+
     try {
       const response = await apiClient.post('/people/employees', data);
       const newEmployee = response.data;
-      
+
       set((state) => ({
         employees: [newEmployee, ...state.employees],
         currentEmployee: newEmployee,
@@ -111,11 +111,11 @@ export const useEmployeeStore = create<EmployeeState>((set, get) => ({
 
   updateEmployee: async (id: string, data: Partial<Employee>) => {
     set({ isLoading: true, error: null });
-    
+
     try {
       const response = await apiClient.patch(`/people/employees/${id}`, data);
       const updatedEmployee = response.data;
-      
+
       set((state) => ({
         employees: state.employees.map((e) => (e.id === id ? updatedEmployee : e)),
         currentEmployee: updatedEmployee,
@@ -132,10 +132,10 @@ export const useEmployeeStore = create<EmployeeState>((set, get) => ({
 
   deleteEmployee: async (id: string) => {
     set({ isLoading: true, error: null });
-    
+
     try {
       await apiClient.delete(`/people/employees/${id}`);
-      
+
       set((state) => ({
         employees: state.employees.filter((e) => e.id !== id),
         currentEmployee: state.currentEmployee?.id === id ? null : state.currentEmployee,

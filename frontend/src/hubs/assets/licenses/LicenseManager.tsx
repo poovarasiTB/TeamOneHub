@@ -1,28 +1,27 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardContent } from '../../../components/Card';
 import { Button } from '../../../components/Button';
 import { Badge } from '../../../components/Badge';
 import { LoadingTable } from '../../../components/Loading';
+import { useAssetStore } from '../../../store/assetStore';
 import toast from 'react-hot-toast';
 
 export function LicenseManager() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [licenses, setLicenses] = useState([
-    { id: 1, name: 'Microsoft 365 Business', publisher: 'Microsoft', type: 'subscription', totalSeats: 100, usedSeats: 85, expiryDate: '2026-12-31', status: 'active', complianceStatus: 'compliant' },
-    { id: 2, name: 'Adobe Creative Cloud', publisher: 'Adobe', type: 'subscription', totalSeats: 50, usedSeats: 48, expiryDate: '2026-06-30', status: 'active', complianceStatus: 'compliant' },
-    { id: 3, name: 'JetBrains All Products', publisher: 'JetBrains', type: 'subscription', totalSeats: 75, usedSeats: 75, expiryDate: '2026-03-31', status: 'active', complianceStatus: 'overallocated' },
-    { id: 4, name: 'Slack Pro', publisher: 'Slack', type: 'subscription', totalSeats: 200, usedSeats: 156, expiryDate: '2027-01-31', status: 'active', complianceStatus: 'compliant' },
-    { id: 5, name: 'Zoom Pro', publisher: 'Zoom', type: 'subscription', totalSeats: 100, usedSeats: 78, expiryDate: '2026-08-31', status: 'active', complianceStatus: 'compliant' },
-  ]);
+  const { licenses, fetchLicenses, isLoading } = useAssetStore();
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 1000);
-    return () => clearTimeout(timer);
-  }, []);
+    fetchLicenses();
+  }, [fetchLicenses]);
 
-  const handleRenew = (id: number) => {
+  const handleRenew = (id: string) => {
     toast.success('License renewal initiated');
   };
+
+  const filteredLicenses = licenses.filter(l =>
+    l.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    l.publisher.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const complianceSummary = {
     compliant: licenses.filter(l => l.complianceStatus === 'compliant').length,
@@ -31,7 +30,7 @@ export function LicenseManager() {
     expired: licenses.filter(l => l.complianceStatus === 'expired').length,
   };
 
-  if (isLoading) {
+  if (isLoading && licenses.length === 0) {
     return (
       <div>
         <div className="flex justify-between items-center mb-6">
@@ -58,25 +57,25 @@ export function LicenseManager() {
 
       {/* Compliance Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-        <Card>
+        <Card className="bg-bg-800/50 border-border-12">
           <CardContent className="p-6 text-center">
             <p className="text-sm text-text-400 mb-2">Compliant</p>
             <p className="text-3xl font-bold text-success">{complianceSummary.compliant}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="bg-bg-800/50 border-border-12">
           <CardContent className="p-6 text-center">
             <p className="text-sm text-text-400 mb-2">Over-allocated</p>
             <p className="text-3xl font-bold text-error">{complianceSummary.overallocated}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="bg-bg-800/50 border-border-12">
           <CardContent className="p-6 text-center">
             <p className="text-sm text-text-400 mb-2">Expiring Soon</p>
             <p className="text-3xl font-bold text-warning">{complianceSummary.expiringSoon}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="bg-bg-800/50 border-border-12">
           <CardContent className="p-6 text-center">
             <p className="text-sm text-text-400 mb-2">Expired</p>
             <p className="text-3xl font-bold text-text-300">{complianceSummary.expired}</p>
@@ -93,15 +92,10 @@ export function LicenseManager() {
               <input
                 type="text"
                 placeholder="Search licenses..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
                 className="px-4 py-2 bg-bg-800 border border-border-12 rounded-xl text-text-80 placeholder-text-40 focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
-              <select className="px-4 py-2 bg-bg-800 border border-border-12 rounded-xl text-text-80 focus:outline-none focus:ring-2 focus:ring-primary-500">
-                <option value="">All Compliance</option>
-                <option value="compliant">Compliant</option>
-                <option value="overallocated">Over-allocated</option>
-                <option value="expiring-soon">Expiring Soon</option>
-                <option value="expired">Expired</option>
-              </select>
             </div>
           </div>
         </CardHeader>
@@ -120,7 +114,7 @@ export function LicenseManager() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-12">
-                {licenses.map((license) => (
+                {filteredLicenses.map((license) => (
                   <tr key={license.id} className="hover:bg-bg-800/50 transition-colors">
                     <td className="py-4 px-6">
                       <p className="text-text-100 font-medium">{license.name}</p>
@@ -137,10 +131,9 @@ export function LicenseManager() {
                         </div>
                         <div className="w-full bg-bg-700 rounded-full h-2">
                           <div
-                            className={`h-2 rounded-full ${
-                              (license.usedSeats / license.totalSeats) > 0.9 ? 'bg-error' :
-                              (license.usedSeats / license.totalSeats) > 0.7 ? 'bg-warning' : 'bg-success'
-                            }`}
+                            className={`h-2 rounded-full ${(license.usedSeats / license.totalSeats) > 0.9 ? 'bg-error' :
+                                (license.usedSeats / license.totalSeats) > 0.7 ? 'bg-warning' : 'bg-success'
+                              }`}
                             style={{ width: `${(license.usedSeats / license.totalSeats) * 100}%` }}
                           ></div>
                         </div>
@@ -152,8 +145,8 @@ export function LicenseManager() {
                     <td className="py-4 px-6">
                       <Badge variant={
                         license.complianceStatus === 'compliant' ? 'success' :
-                        license.complianceStatus === 'overallocated' ? 'error' :
-                        license.complianceStatus === 'expiring-soon' ? 'warning' : 'default'
+                          license.complianceStatus === 'overallocated' ? 'error' :
+                            license.complianceStatus === 'expiring-soon' ? 'warning' : 'default'
                       }>
                         {license.complianceStatus}
                       </Badge>

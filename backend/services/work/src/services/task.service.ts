@@ -15,6 +15,8 @@ interface Task {
   reporterId?: string;
   estimatedHours?: number;
   actualHours?: number;
+  storyPoints?: number;
+  timeSpent?: number;
   dueDate?: string;
   startDate?: string;
   completedAt?: string;
@@ -116,8 +118,8 @@ export class TaskService {
       INSERT INTO tasks (
         tenant_id, project_id, parent_task_id, title, description,
         status, priority, assignee_id, reporter_id, estimated_hours,
-        due_date, start_date, tags, created_by, updated_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        due_date, start_date, tags, created_by, updated_by, story_points, time_spent
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
       RETURNING *
     `;
 
@@ -137,6 +139,8 @@ export class TaskService {
       data.tags ? JSON.stringify(data.tags) : null,
       userId,
       userId,
+      data.storyPoints,
+      data.timeSpent || 0,
     ];
 
     const result = await this.pool.query(query, values);
@@ -160,15 +164,17 @@ export class TaskService {
         actual_hours = COALESCE($7, actual_hours),
         due_date = COALESCE($8, due_date),
         completed_at = COALESCE($9, completed_at),
-        updated_by = $10,
+        story_points = COALESCE($10, story_points),
+        time_spent = COALESCE($11, time_spent),
+        updated_by = $12,
         updated_at = NOW(),
         version = version + 1
-      WHERE id = $11 AND tenant_id = $12 AND is_deleted = FALSE
+      WHERE id = $13 AND tenant_id = $14 AND is_deleted = FALSE
       RETURNING *
     `;
 
     const isCompleted = data.status === 'done' && current.status !== 'done';
-    
+
     const values = [
       data.title,
       data.description,
@@ -179,6 +185,8 @@ export class TaskService {
       data.actualHours,
       data.dueDate,
       isCompleted ? new Date() : null,
+      data.storyPoints,
+      data.timeSpent,
       userId,
       id,
       tenantId,

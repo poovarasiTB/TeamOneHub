@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { useEmployeeStore } from '../../../store/employeeStore';
+import { usePeopleStore } from '../../../store/peopleStore';
 import { Badge } from '../../../components/Badge';
 import { Button } from '../../../components/Button';
 import { Card, CardHeader, CardContent } from '../../../components/Card';
@@ -10,28 +10,20 @@ import toast from 'react-hot-toast';
 export function EmployeeDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { currentEmployee, fetchEmployee, deleteEmployee, isLoading } = useEmployeeStore();
+  const { currentEmployee, fetchEmployee, isLoading } = usePeopleStore();
 
   useEffect(() => {
     if (id) {
       fetchEmployee(id);
     }
-  }, [id]);
+  }, [id, fetchEmployee]);
 
-  const handleDelete = async () => {
-    if (window.confirm('Are you sure you want to delete this employee?')) {
-      try {
-        await deleteEmployee(id!);
-        toast.success('Employee deleted successfully');
-        navigate('/people/employees');
-      } catch (error: any) {
-        toast.error(error.response?.data?.message || 'Failed to delete employee');
-      }
-    }
+  const handleDelete = () => {
+    toast.error('Deletion is restricted to Administrators');
   };
 
   if (isLoading || !currentEmployee) {
-    return <LoadingPage message="Loading employee..." />;
+    return <LoadingPage message="Loading employee details..." />;
   }
 
   return (
@@ -46,7 +38,7 @@ export function EmployeeDetail() {
             <h1 className="text-3xl font-bold text-text-100">
               {currentEmployee.firstName} {currentEmployee.lastName}
             </h1>
-            <p className="text-text-400">{currentEmployee.designation} • {currentEmployee.department}</p>
+            <p className="text-text-400">{currentEmployee.position} • {currentEmployee.department}</p>
             <div className="flex items-center gap-2 mt-2">
               <Badge variant={currentEmployee.status === 'active' ? 'success' : 'warning'}>
                 {currentEmployee.status}
@@ -104,13 +96,15 @@ export function EmployeeDetail() {
                 <dd className="text-text-100">{currentEmployee.department}</dd>
               </div>
               <div>
-                <dt className="text-sm text-text-400">Designation</dt>
-                <dd className="text-text-100">{currentEmployee.designation}</dd>
+                <dt className="text-sm text-text-400">Position</dt>
+                <dd className="text-text-100">{currentEmployee.position}</dd>
               </div>
-              <div>
-                <dt className="text-sm text-text-400">Employee Code</dt>
-                <dd className="text-text-100 font-mono">{currentEmployee.employeeCode}</dd>
-              </div>
+              {currentEmployee.employeeCode && (
+                <div>
+                  <dt className="text-sm text-text-400">Employee Code</dt>
+                  <dd className="text-text-100 font-mono">{currentEmployee.employeeCode}</dd>
+                </div>
+              )}
             </dl>
           </CardContent>
         </Card>

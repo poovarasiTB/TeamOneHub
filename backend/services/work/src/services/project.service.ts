@@ -17,6 +17,13 @@ interface Project {
   endDate?: Date;
   ownerId: string;
   healthStatus: 'green' | 'yellow' | 'red';
+  industryTemplate?: string;
+  clientId?: string;
+  billingType?: string;
+  hourlyRate?: number;
+  dataClassification?: string;
+  isGdprRelevant?: boolean;
+  retentionDays?: number;
   createdAt: Date;
   createdBy: string;
   updatedAt: Date;
@@ -56,7 +63,7 @@ export class ProjectService {
       WHERE tenant_id = $1 
         AND is_deleted = FALSE
     `;
-    
+
     const values: any[] = [tenantId];
     let paramIndex = 2;
 
@@ -102,7 +109,7 @@ export class ProjectService {
       SELECT * FROM projects 
       WHERE id = $1 AND tenant_id = $2 AND is_deleted = FALSE
     `;
-    
+
     const result = await this.pool.query(query, [id, tenantId]);
     return result.rows[0] || null;
   }
@@ -112,7 +119,7 @@ export class ProjectService {
    */
   async create(data: Partial<Project>, userId: string, tenantId: string): Promise<Project> {
     const client = await this.pool.connect();
-    
+
     try {
       await client.query('BEGIN');
 
@@ -123,8 +130,10 @@ export class ProjectService {
         INSERT INTO projects (
           tenant_id, code, name, description, status, type,
           budget, currency, start_date, end_date, owner_id,
-          health_status, created_by, updated_by
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+          health_status, created_by, updated_by,
+          industry_template, client_id, billing_type, hourly_rate,
+          data_classification, is_gdpr_relevant, retention_days
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
         RETURNING *
       `;
 
@@ -143,6 +152,13 @@ export class ProjectService {
         data.healthStatus || 'green',
         userId,
         userId,
+        data.industryTemplate,
+        data.clientId,
+        data.billingType || 'fixed',
+        data.hourlyRate,
+        data.dataClassification || 'internal',
+        data.isGdprRelevant || false,
+        data.retentionDays || 2555
       ];
 
       const result = await client.query(query, values);
@@ -160,9 +176,9 @@ export class ProjectService {
       });
 
       await client.query('COMMIT');
-      
+
       logger.info(`Project created: ${project.id} (${project.code})`);
-      
+
       return project;
     } catch (error) {
       await client.query('ROLLBACK');
@@ -178,7 +194,7 @@ export class ProjectService {
    */
   async update(id: string, data: Partial<Project>, userId: string, tenantId: string): Promise<Project> {
     const client = await this.pool.connect();
-    
+
     try {
       await client.query('BEGIN');
 
@@ -200,10 +216,17 @@ export class ProjectService {
           start_date = COALESCE($7, start_date),
           end_date = COALESCE($8, end_date),
           health_status = COALESCE($9, health_status),
-          updated_by = $10,
+          industry_template = COALESCE($10, industry_template),
+          client_id = COALESCE($11, client_id),
+          billing_type = COALESCE($12, billing_type),
+          hourly_rate = COALESCE($13, hourly_rate),
+          data_classification = COALESCE($14, data_classification),
+          is_gdpr_relevant = COALESCE($15, is_gdpr_relevant),
+          retention_days = COALESCE($16, retention_days),
+          updated_by = $17,
           updated_at = NOW(),
           version = version + 1
-        WHERE id = $11 AND tenant_id = $12 AND is_deleted = FALSE
+        WHERE id = $18 AND tenant_id = $19 AND is_deleted = FALSE
         RETURNING *
       `;
 
@@ -217,6 +240,13 @@ export class ProjectService {
         data.startDate,
         data.endDate,
         data.healthStatus,
+        data.industryTemplate,
+        data.clientId,
+        data.billingType,
+        data.hourlyRate,
+        data.dataClassification,
+        data.isGdprRelevant,
+        data.retentionDays,
         userId,
         id,
         tenantId,
@@ -233,16 +263,16 @@ export class ProjectService {
         resourceType: 'project',
         userId,
         tenantId,
-        changes: { 
-          before: currentProject, 
-          after: project 
+        changes: {
+          before: currentProject,
+          after: project
         },
       });
 
       await client.query('COMMIT');
-      
+
       logger.info(`Project updated: ${project.id}`);
-      
+
       return project;
     } catch (error) {
       await client.query('ROLLBACK');
@@ -258,7 +288,7 @@ export class ProjectService {
    */
   async delete(id: string, userId: string, tenantId: string): Promise<void> {
     const client = await this.pool.connect();
-    
+
     try {
       await client.query('BEGIN');
 
@@ -291,7 +321,7 @@ export class ProjectService {
       });
 
       await client.query('COMMIT');
-      
+
       logger.info(`Project deleted: ${id}`);
     } catch (error) {
       await client.query('ROLLBACK');
@@ -317,7 +347,7 @@ export class ProjectService {
     `;
 
     const result = await this.pool.query(query, [tenantId]);
-    
+
     const stats = {
       total: 0,
       byStatus: {} as Record<string, number>,
@@ -352,7 +382,7 @@ export class ProjectService {
   }
 
   /**
-   * Get project timeline
+   * Get project timeline (Gantt Chart data)
    */
   async getTimeline(id: string, tenantId: string) {
     const query = `
@@ -361,7 +391,41 @@ export class ProjectService {
       WHERE id = $1 AND tenant_id = $2 AND is_deleted = FALSE
     `;
     const result = await this.pool.query(query, [id, tenantId]);
-    return result.rows[0] || null;
+    const project = result.rows[0];
+
+    if (!project) return null;
+
+    // Fetch tasks for timeline
+    const tasksQuery = `
+      SELECT id, title as name, start_date, due_date as end_date, status, assignee_id, priority, estimated_hours
+      FROM tasks
+      WHERE project_id = $1 AND tenant_id = $2 AND is_deleted = FALSE
+    `;
+    const tasksResult = await this.pool.query(tasksQuery, [id, tenantId]);
+
+    // Fetch milestones for timeline
+    const milestonesQuery = `
+      SELECT id, name, due_date as end_date, 'milestone' as type, status
+      FROM milestones
+      WHERE project_id = $1
+    `;
+    const milestonesResult = await this.pool.query(milestonesQuery, [id]);
+
+    // Fetch dependencies
+    const dependenciesQuery = `
+      SELECT td.id, td.task_id as source, td.depends_on_task_id as target, td.type
+      FROM task_dependencies td
+      JOIN tasks t ON td.task_id = t.id
+      WHERE t.project_id = $1 AND t.tenant_id = $2 AND t.is_deleted = FALSE
+    `;
+    const dependenciesResult = await this.pool.query(dependenciesQuery, [id, tenantId]);
+
+    return {
+      project,
+      tasks: tasksResult.rows,
+      milestones: milestonesResult.rows,
+      dependencies: dependenciesResult.rows
+    };
   }
 
   /**

@@ -15,6 +15,7 @@ import employeeRoutes from './routes/employee.routes';
 import attendanceRoutes from './routes/attendance.routes';
 import leaveRoutes from './routes/leave.routes';
 import payrollRoutes from './routes/payroll.routes';
+import performanceRoutes from './routes/performance.routes';
 import { logger } from './utils/logger';
 import { errorHandler } from './middleware/errorHandler';
 
@@ -51,12 +52,12 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Request logging
 app.use((req: Request, res: Response, next: NextFunction) => {
   const start = Date.now();
-  
+
   res.on('finish', () => {
     const duration = Date.now() - start;
     logger.info(`${req.method} ${req.path} ${res.statusCode} ${duration}ms`);
   });
-  
+
   next();
 });
 
@@ -75,6 +76,7 @@ app.use('/api/employees', employeeRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/leave', leaveRoutes);
 app.use('/api/payroll', payrollRoutes);
+app.use('/api/performance', performanceRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {

@@ -1,208 +1,85 @@
-import React from 'react';
-import { useProjectStore } from '@/store/projectStore';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Badge } from '@/components/Badge';
-import { Button } from '@/components/Button';
-import { Card, CardContent } from '@/components/Card';
-import { LoadingTable } from '@/components/Loading';
+import { Card, CardHeader, CardContent } from '../../../components/Card';
+import { Button } from '../../../components/Button';
+import { Badge } from '../../../components/Badge';
+import { useProjectStore } from '../../../store/projectStore';
+import { LoadingTable } from '../../../components/Loading';
 
 export function ProjectList() {
-  const { projects, pagination, fetchProjects, isLoading, error } = useProjectStore();
-  const [filters, setFilters] = React.useState({ page: 1, limit: 20, status: '', search: '' });
+  const { projects, fetchProjects, isLoading } = useProjectStore();
+  const [searchTerm, setSearchTerm] = useState('');
 
-  React.useEffect(() => {
-    fetchProjects(filters);
-  }, [filters]);
-
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFilters({ ...filters, search: e.target.value, page: 1 });
-  };
-
-  const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setFilters({ ...filters, status: e.target.value, page: 1 });
-  };
+  useEffect(() => {
+    fetchProjects();
+  }, [fetchProjects]);
 
   if (isLoading && projects.length === 0) {
-    return (
-      <div>
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h1 className="text-3xl font-bold text-text-100">Projects</h1>
-            <p className="text-text-400 mt-1">Manage all your projects</p>
-          </div>
-          <Link to="/work/projects/new">
-            <Button variant="primary">
-              <span className="text-xl mr-2">+</span>
-              New Project
-            </Button>
-          </Link>
-        </div>
-        <LoadingTable rows={5} columns={6} />
-      </div>
-    );
+    return <LoadingTable rows={5} columns={5} />;
   }
 
+  const filtered = projects.filter(p =>
+    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.code.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
+    <div className="space-y-6 pb-20">
+      <div className="flex justify-between items-center text-left">
         <div>
-          <h1 className="text-3xl font-bold text-text-100">Projects</h1>
-          <p className="text-text-400 mt-1">Manage all your projects</p>
+          <h1 className="text-3xl font-bold text-text-100 font-serif italic">Project Portfolio</h1>
+          <p className="text-text-400 mt-1 italic">Enterprise project governance and delivery monitoring</p>
         </div>
         <Link to="/work/projects/new">
-          <Button variant="primary">
-            <span className="text-xl mr-2">+</span>
-            New Project
-          </Button>
+          <Button variant="primary">+ Initiate Project</Button>
         </Link>
       </div>
 
-      {error && (
-        <div className="mb-6 p-4 bg-error/10 border border-error/20 rounded-xl">
-          <p className="text-error text-sm">{error}</p>
-        </div>
-      )}
-
-      {/* Filters */}
-      <Card className="mb-6">
-        <CardContent className="p-4">
-          <div className="flex gap-4">
-            <input
-              type="text"
-              placeholder="Search projects..."
-              value={filters.search}
-              onChange={handleSearch}
-              className="flex-1 px-4 py-2 bg-bg-800 border border-border-12 rounded-xl text-text-80 placeholder-text-40 focus:outline-none focus:ring-2 focus:ring-primary-500"
-            />
-            <select
-              value={filters.status}
-              onChange={handleStatusChange}
-              className="px-4 py-2 bg-bg-800 border border-border-12 rounded-xl text-text-80 focus:outline-none focus:ring-2 focus:ring-primary-500"
-            >
-              <option value="">All Status</option>
-              <option value="planning">Planning</option>
-              <option value="active">Active</option>
-              <option value="on-hold">On Hold</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-          </div>
+      <Card className="bg-bg-800/50 border-primary-500/10">
+        <CardContent className="p-4 flex gap-4">
+          <input
+            type="text"
+            placeholder="Search projects by name, code or client..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="flex-1 bg-bg-900 border border-border-12 rounded-xl px-4 py-2 text-text-100 focus:ring-2 focus:ring-primary-500"
+          />
+          <Badge variant="info">{projects.length} Active Workstreams</Badge>
         </CardContent>
       </Card>
 
-      {/* Projects Table */}
-      <Card>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-bg-800">
-                <tr>
-                  <th className="text-left py-4 px-6 text-sm font-semibold text-text-400">Code</th>
-                  <th className="text-left py-4 px-6 text-sm font-semibold text-text-400">Name</th>
-                  <th className="text-left py-4 px-6 text-sm font-semibold text-text-400">Status</th>
-                  <th className="text-left py-4 px-6 text-sm font-semibold text-text-400">Health</th>
-                  <th className="text-left py-4 px-6 text-sm font-semibold text-text-400">Budget</th>
-                  <th className="text-left py-4 px-6 text-sm font-semibold text-text-400">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-12">
-                {projects.map((project) => (
-                  <tr key={project.id} className="hover:bg-bg-800/50 transition-colors">
-                    <td className="py-4 px-6 text-text-600 font-mono">{project.code}</td>
-                    <td className="py-4 px-6">
-                      <Link
-                        to={`/work/projects/${project.id}`}
-                        className="text-primary-400 hover:text-primary-300 font-medium"
-                      >
-                        {project.name}
-                      </Link>
-                    </td>
-                    <td className="py-4 px-6">
-                      <Badge
-                        variant={
-                          project.status === 'active'
-                            ? 'success'
-                            : project.status === 'completed'
-                              ? 'info'
-                              : project.status === 'on-hold'
-                                ? 'warning'
-                                : project.status === 'cancelled'
-                                  ? 'error'
-                                  : 'default'
-                        }
-                      >
-                        {project.status}
-                      </Badge>
-                    </td>
-                    <td className="py-4 px-6">
-                      <Badge
-                        variant={
-                          project.healthStatus === 'green'
-                            ? 'success'
-                            : project.healthStatus === 'yellow'
-                              ? 'warning'
-                              : 'error'
-                        }
-                      >
-                        {project.healthStatus}
-                      </Badge>
-                    </td>
-                    <td className="py-4 px-6 text-text-600">
-                      {project.budget ? `$${(project.budget / 1000).toFixed(0)}K` : '-'}
-                    </td>
-                    <td className="py-4 px-6">
-                      <Link
-                        to={`/work/projects/${project.id}`}
-                        className="text-primary-400 hover:text-primary-300 text-sm font-medium"
-                      >
-                        View →
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            {projects.length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-text-400 mb-4">No projects found</p>
-                <Link to="/work/projects/new">
-                  <Button variant="primary">Create Your First Project</Button>
-                </Link>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {filtered.map((project) => (
+          <Card key={project.id} className="hover:border-primary-500/30 transition-all group overflow-hidden shadow-2xl">
+            <div className={`h-1.5 w-full ${project.healthStatus === 'green' ? 'bg-success' :
+                project.healthStatus === 'yellow' ? 'bg-warning' : 'bg-error'
+              }`} />
+            <CardHeader className="pb-2">
+              <div className="flex justify-between items-start">
+                <span className="text-[10px] font-mono text-text-500 uppercase tracking-widest">{project.code}</span>
+                <Badge variant={project.status === 'active' ? 'success' : 'default'}>{project.status}</Badge>
               </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+              <Link to={`/work/projects/${project.id}`} className="block mt-2">
+                <h3 className="text-xl font-bold text-text-100 group-hover:text-primary-400 transition-colors truncate">{project.name}</h3>
+              </Link>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-text-400 line-clamp-2 mb-6 h-10">{project.description || 'No description provided for this workstream.'}</p>
 
-      {/* Pagination */}
-      {pagination.totalPages > 1 && (
-        <div className="flex justify-between items-center mt-6">
-          <p className="text-sm text-text-400">
-            Showing {((pagination.page - 1) * pagination.limit) + 1} to{' '}
-            {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
-            {pagination.total} projects
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setFilters({ ...filters, page: pagination.page - 1 })}
-              disabled={pagination.page === 1}
-            >
-              Previous
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setFilters({ ...filters, page: pagination.page + 1 })}
-              disabled={pagination.page === pagination.totalPages}
-            >
-              Next
-            </Button>
-          </div>
-        </div>
-      )}
+              <div className="flex justify-between items-end border-t border-border-12 pt-4">
+                <div>
+                  <p className="text-[10px] text-text-600 uppercase font-black">Timeline</p>
+                  <p className="text-xs text-text-200">{project.startDate} — {project.endDate || 'TBD'}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] text-text-600 uppercase font-black">Budget Utilization</p>
+                  <p className="text-sm font-bold text-text-100">${project.budget?.toLocaleString()}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 }

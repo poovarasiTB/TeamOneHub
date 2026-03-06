@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useInvoiceStore } from '../../../store/invoiceStore';
+import { useCustomerStore } from '../../../store/customerStore';
 import { Button } from '../../../components/Button';
 import { Card, CardHeader, CardContent } from '../../../components/Card';
-import { validateForm, createInvoiceSchema } from '../../../utils/validation';
 import { LoadingSpinner } from '../../../components/Loading';
 import toast from 'react-hot-toast';
 
@@ -17,12 +17,17 @@ interface InvoiceItem {
 export function CreateInvoice() {
   const navigate = useNavigate();
   const { createInvoice, isLoading } = useInvoiceStore();
+  const { customers, fetchCustomers } = useCustomerStore();
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState({
     customerId: '',
     dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     notes: '',
   });
+
+  useEffect(() => {
+    fetchCustomers();
+  }, [fetchCustomers]);
   const [items, setItems] = useState<InvoiceItem[]>([
     { description: '', quantity: 1, unitPrice: 0, taxRate: 0 },
   ]);
@@ -95,14 +100,15 @@ export function CreateInvoice() {
                 name="customerId"
                 value={formData.customerId}
                 onChange={(e) => setFormData({ ...formData, customerId: e.target.value })}
-                className={`w-full px-4 py-3 bg-bg-800 border rounded-xl text-text-80 focus:outline-none focus:ring-2 focus:ring-primary-500 ${
-                  validationErrors.customerId ? 'border-error' : 'border-border-12'
-                }`}
+                className={`w-full px-4 py-3 bg-bg-800 border rounded-xl text-text-80 focus:outline-none focus:ring-2 focus:ring-primary-500 ${validationErrors.customerId ? 'border-error' : 'border-border-12'
+                  }`}
               >
                 <option value="">Select Customer</option>
-                <option value="customer-1">Acme Corp</option>
-                <option value="customer-2">TechStart Inc</option>
-                <option value="customer-3">Global Ltd</option>
+                {customers.map(customer => (
+                  <option key={customer.id} value={customer.id}>
+                    {customer.name} {customer.email ? `(${customer.email})` : ''}
+                  </option>
+                ))}
               </select>
               {validationErrors.customerId && (
                 <p className="mt-1 text-sm text-error">{validationErrors.customerId}</p>

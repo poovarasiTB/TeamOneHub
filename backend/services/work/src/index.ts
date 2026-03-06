@@ -15,6 +15,7 @@ import projectRoutes from './routes/project.routes';
 import taskRoutes from './routes/task.routes';
 import whiteboardRoutes from './routes/whiteboard.routes';
 import sprintRoutes from './routes/sprint.routes';
+import timesheetRoutes from './routes/timesheet.routes';
 import { logger } from './utils/logger';
 import { errorHandler } from './middleware/errorHandler';
 import { healthCheck } from './routes/health.routes';
@@ -73,6 +74,7 @@ app.use('/api/projects', projectRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/whiteboards', whiteboardRoutes);
 app.use('/api/sprints', sprintRoutes);
+app.use('/api/timesheets', timesheetRoutes);
 
 /**
  * Root endpoint
