@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import apiClient from '../lib/api';
+import { apiClient } from '@/lib/api';
 
 export interface Task {
   id: string;
@@ -163,12 +163,12 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   updateTaskStatus: async (id: string, status: Task['status']) => {
     try {
       await apiClient.patch(`/work/tasks/${id}`, { status });
-      
+
       set((state) => ({
-        tasks: state.tasks.map((t) => 
+        tasks: state.tasks.map((t) =>
           t.id === id ? { ...t, status, updatedAt: new Date().toISOString() } : t
         ),
-        currentTask: state.currentTask?.id === id 
+        currentTask: state.currentTask?.id === id
           ? { ...state.currentTask, status, updatedAt: new Date().toISOString() }
           : state.currentTask,
       }));

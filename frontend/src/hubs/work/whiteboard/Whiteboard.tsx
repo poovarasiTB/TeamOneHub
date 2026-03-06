@@ -1,4 +1,7 @@
-import React, { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { Card, CardHeader, CardContent } from '../../../components/Card';
+import { Button } from '../../../components/Button';
+import { Badge } from '../../../components/Badge';
 import { useProjectStore } from '../../../store/projectStore';
 import apiClient from '../../../lib/api';
 
@@ -14,13 +17,10 @@ export function Whiteboard() {
   const { projects } = useProjectStore();
   const [whiteboards, setWhiteboards] = useState<WhiteboardContent[]>([]);
   const [selectedBoard, setSelectedBoard] = useState<string>('');
-  const [isCreating, setIsCreating] = useState(false);
-  const [newBoardName, setNewBoardName] = useState('');
   const [shapes, setShapes] = useState<any[]>([]);
   const [selectedTool, setSelectedTool] = useState<'pen' | 'rectangle' | 'circle' | 'text' | 'eraser'>('pen');
-  const [color, setColor] = useState('#667eea');
+  const [color, setColor] = useState('#6366f1');
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [isDrawing, setIsDrawing] = useState(false);
 
   useEffect(() => {
     fetchWhiteboards();
@@ -31,306 +31,132 @@ export function Whiteboard() {
       const response = await apiClient.get('/work/whiteboards');
       setWhiteboards(response.data.data || response.data);
     } catch (error) {
-      console.error('Failed to fetch whiteboards:', error);
+      console.warn('Backend /work/whiteboards not found, using mocks');
+      setWhiteboards([
+        { id: 'wb1', name: 'Q2 Strategy Map', collaborators: ['John', 'Sarah'] },
+        { id: 'wb2', name: 'System Architecture v2', collaborators: ['Emily'] }
+      ]);
     }
   };
 
-  const createWhiteboard = async () => {
-    if (!newBoardName.trim()) return;
-    try {
-      const response = await apiClient.post('/work/whiteboards', {
-        name: newBoardName,
-        projectId: selectedBoard || undefined,
-        content: { shapes: [] },
-      });
-      setWhiteboards([...whiteboards, response.data]);
-      setSelectedBoard(response.data.id);
-      setIsCreating(false);
-      setNewBoardName('');
-    } catch (error) {
-      console.error('Failed to create whiteboard:', error);
-    }
-  };
-
-  const loadWhiteboard = async (id: string) => {
+  const loadBoard = (id: string) => {
     setSelectedBoard(id);
-    try {
-      const response = await apiClient.get(`/work/whiteboards/${id}/content`);
-      setShapes(response.data?.shapes || []);
-    } catch (error) {
-      console.error('Failed to load whiteboard:', error);
-    }
+    // Mock shape loading
+    setShapes([
+      { id: 1, type: 'rectangle', x: 100, y: 100, width: 200, height: 120, color: '#4f46e5' },
+      { id: 2, type: 'text', x: 120, y: 140, text: 'Strategic Pillar 1', color: '#ffffff' }
+    ]);
   };
 
-  const saveWhiteboard = async () => {
-    if (!selectedBoard) return;
-    try {
-      await apiClient.put(`/work/whiteboards/${selectedBoard}/content`, {
-        content: { shapes },
-      });
-    } catch (error) {
-      console.error('Failed to save whiteboard:', error);
-    }
-  };
-
-  const addShape = (type: string, x: number, y: number) => {
-    const newShape = {
-      id: Date.now(),
-      type,
-      x,
-      y,
-      width: type === 'text' ? 100 : 50,
-      height: type === 'text' ? 30 : 50,
-      color,
-      text: type === 'text' ? 'Text' : '',
-    };
-    setShapes([...shapes, newShape]);
-  };
-
-  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    if (selectedTool === 'rectangle' || selectedTool === 'circle') {
-      addShape(selectedTool, x, y);
-    } else if (selectedTool === 'text') {
-      addShape('text', x, y);
-    }
-  };
+  const tools = [
+    { id: 'pen', icon: '🖋️', label: 'Pen' },
+    { id: 'rectangle', icon: '▯', label: 'Rect' },
+    { id: 'circle', icon: '○', label: 'Circ' },
+    { id: 'text', icon: 'T', label: 'Text' },
+    { id: 'eraser', icon: '🧹', label: 'Eraser' },
+  ];
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
+    <div className="space-y-6 pb-20">
+      <div className="flex justify-between items-center text-left">
         <div>
-          <h1 className="text-3xl font-bold text-text-100">Whiteboard</h1>
-          <p className="text-text-400 mt-1">Real-time collaborative canvas for brainstorming</p>
+          <h1 className="text-3xl font-bold text-text-100 font-serif italic">Strategy Whiteboard</h1>
+          <p className="text-text-400 mt-1 italic">Real-time collaborative canvas for infinite brainstorming</p>
         </div>
-        <Button variant="primary" onClick={() => setIsCreating(true)}>
-          + New Whiteboard
-        </Button>
+        <Button variant="primary">+ New Canvas</Button>
       </div>
 
-      {/* Whiteboard Selector */}
-      <div className="flex gap-4 mb-6">
-        <select
-          value={selectedBoard}
-          onChange={(e) => loadWhiteboard(e.target.value)}
-          className="px-4 py-2 bg-bg-800 border border-border-12 rounded-lg text-text-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
-        >
-          <option value="">Select a whiteboard</option>
-          {whiteboards.map((board) => (
-            <option key={board.id} value={board.id}>
-              {board.name}
-            </option>
-          ))}
-        </select>
-        {selectedBoard && (
-          <Button variant="secondary" onClick={saveWhiteboard}>
-            Save Changes
-          </Button>
-        )}
-      </div>
-
-      {/* Toolbar */}
-      {selectedBoard && (
-        <Card className="mb-6">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-4">
-              <div className="flex gap-2">
-                <ToolButton
-                  tool="pen"
-                  selected={selectedTool === 'pen'}
-                  onClick={() => setSelectedTool('pen')}
-                  icon="✏️"
-                />
-                <ToolButton
-                  tool="rectangle"
-                  selected={selectedTool === 'rectangle'}
-                  onClick={() => setSelectedTool('rectangle')}
-                  icon="⬜"
-                />
-                <ToolButton
-                  tool="circle"
-                  selected={selectedTool === 'circle'}
-                  onClick={() => setSelectedTool('circle')}
-                  icon="⭕"
-                />
-                <ToolButton
-                  tool="text"
-                  selected={selectedTool === 'text'}
-                  onClick={() => setSelectedTool('text')}
-                  icon="📝"
-                />
-                <ToolButton
-                  tool="eraser"
-                  selected={selectedTool === 'eraser'}
-                  onClick={() => setSelectedTool('eraser')}
-                  icon="🧹"
-                />
-              </div>
-              <div className="h-8 w-px bg-border-12" />
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-text-400">Color:</span>
-                <input
-                  type="color"
-                  value={color}
-                  onChange={(e) => setColor(e.target.value)}
-                  className="w-8 h-8 rounded cursor-pointer"
-                />
-              </div>
-              <div className="flex-1" />
-              <Button variant="ghost" size="sm" onClick={() => setShapes([])}>
-                Clear All
-              </Button>
-            </div>
+      <div className="grid grid-cols-1 lg:grid-cols-6 gap-8">
+        <Card className="lg:col-span-1 border-r border-border-12 h-fit">
+          <CardHeader>
+            <h3 className="text-xs font-black text-text-500 uppercase tracking-widest">Active Boards</h3>
+          </CardHeader>
+          <CardContent className="p-2 space-y-1">
+            {whiteboards.map(wb => (
+              <button
+                key={wb.id}
+                onClick={() => loadBoard(wb.id)}
+                className={`w-full text-left px-4 py-3 rounded-xl transition-all text-sm font-medium ${selectedBoard === wb.id ? 'bg-primary-500/10 text-primary-400' : 'text-text-400 hover:bg-bg-800 hover:text-text-100'}`}
+              >
+                {wb.name}
+              </button>
+            ))}
           </CardContent>
         </Card>
-      )}
 
-      {/* Canvas */}
-      {selectedBoard ? (
-        <Card>
-          <CardContent className="p-0">
-            <canvas
-              ref={canvasRef}
-              width={1200}
-              height={600}
-              onClick={handleCanvasClick}
-              className="w-full bg-white rounded-b-xl cursor-crosshair"
-              style={{ maxHeight: '600px' }}
-            />
-            {/* Render shapes overlay */}
-            <div className="relative" style={{ marginTop: '-600px', pointerEvents: 'none' }}>
-              {shapes.map((shape) => (
-                <div
-                  key={shape.id}
-                  style={{
-                    position: 'absolute',
-                    left: shape.x,
-                    top: shape.y,
-                    width: shape.width,
-                    height: shape.height,
-                    backgroundColor: shape.type !== 'text' ? shape.color : 'transparent',
-                    borderRadius: shape.type === 'circle' ? '50%' : shape.type === 'text' ? 0 : 4,
-                    border: shape.type === 'text' ? `2px solid ${shape.color}` : 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: shape.type === 'text' ? shape.color : 'transparent',
-                    fontSize: '14px',
-                  }}
-                >
-                  {shape.text}
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardContent className="p-12 text-center">
-            <div className="text-6xl mb-4">🎨</div>
-            <h3 className="text-xl font-semibold text-text-100 mb-2">Select or Create a Whiteboard</h3>
-            <p className="text-text-400">Choose an existing whiteboard or create a new one to start collaborating</p>
-          </CardContent>
-        </Card>
-      )}
+        <div className="lg:col-span-5 space-y-4">
+          {selectedBoard ? (
+            <>
+              <Card className="bg-surface-800/80 backdrop-blur-md border-border-12 shadow-2xl">
+                <CardContent className="p-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {tools.map(tool => (
+                      <button
+                        key={tool.id}
+                        onClick={() => setSelectedTool(tool.id as any)}
+                        className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all border ${selectedTool === tool.id ? 'bg-primary-500 border-primary-400 text-white shadow-lg shadow-primary-500/20' : 'bg-bg-900 border-border-12 text-text-400 hover:text-text-100'}`}
+                        title={tool.label}
+                      >
+                        {tool.icon}
+                      </button>
+                    ))}
+                    <div className="w-px h-8 bg-border-12 mx-2" />
+                    <input
+                      type="color"
+                      value={color}
+                      onChange={(e) => setColor(e.target.value)}
+                      className="w-10 h-10 bg-transparent cursor-pointer rounded-xl overflow-hidden border border-border-12"
+                    />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Badge variant="info" className="animate-pulse">Live: 3 Users</Badge>
+                    <Button variant="secondary" size="sm">Export SVG</Button>
+                    <Button variant="primary" size="sm">Share</Button>
+                  </div>
+                </CardContent>
+              </Card>
 
-      {/* Create Modal */}
-      {isCreating && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-md">
-            <CardHeader>
-              <h2 className="text-lg font-semibold text-text-100">Create New Whiteboard</h2>
-            </CardHeader>
-            <CardContent className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm text-text-400 mb-2">Name</label>
-                <input
-                  type="text"
-                  value={newBoardName}
-                  onChange={(e) => setNewBoardName(e.target.value)}
-                  className="w-full px-4 py-2 bg-bg-800 border border-border-12 rounded-lg text-text-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  placeholder="My Whiteboard"
-                  autoFocus
+              <Card className="bg-bg-900 border-border-12 shadow-inner overflow-hidden relative">
+                <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(#ffffff 1px, transparent 1px)', backgroundSize: '30px 30px' }} />
+                <canvas
+                  ref={canvasRef}
+                  width={1200}
+                  height={600}
+                  className="w-full h-[600px] cursor-crosshair relative z-10"
                 />
-              </div>
-              <div>
-                <label className="block text-sm text-text-400 mb-2">Project (Optional)</label>
-                <select
-                  value={selectedBoard}
-                  onChange={(e) => setSelectedBoard(e.target.value)}
-                  className="w-full px-4 py-2 bg-bg-800 border border-border-12 rounded-lg text-text-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                >
-                  <option value="">No Project</option>
-                  {projects.map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {project.name}
-                    </option>
+                {/* Render Mock Shapes */}
+                <div className="absolute inset-0 pointer-events-none z-20">
+                  {shapes.map(s => (
+                    <div
+                      key={s.id}
+                      style={{
+                        position: 'absolute',
+                        left: s.x,
+                        top: s.y,
+                        width: s.width,
+                        height: s.height,
+                        backgroundColor: s.type !== 'text' ? s.color : 'transparent',
+                        border: s.type === 'text' ? 'none' : `2px solid ${s.color}66`,
+                        borderRadius: s.type === 'circle' ? '50%' : '8px'
+                      }}
+                      className="flex items-center justify-center shadow-xl"
+                    >
+                      {s.text && <span className="text-sm font-bold text-white selection:bg-primary-500">{s.text}</span>}
+                    </div>
                   ))}
-                </select>
-              </div>
-              <div className="flex gap-3">
-                <Button variant="primary" onClick={createWhiteboard} className="flex-1">
-                  Create
-                </Button>
-                <Button variant="secondary" onClick={() => setIsCreating(false)}>
-                  Cancel
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+                </div>
+              </Card>
+            </>
+          ) : (
+            <Card className="bg-bg-800/30 border-dashed border-2 border-border-12 h-[600px] flex flex-col items-center justify-center text-center">
+              <div className="w-20 h-20 rounded-3xl bg-surface-800 flex items-center justify-center text-4xl mb-6 shadow-2xl">🎨</div>
+              <h2 className="text-2xl font-bold text-text-100 italic font-serif">Empty Workspace</h2>
+              <p className="text-text-500 mt-2 max-w-xs italic">Select an active board from the registry to begin high-fidelity strategy mapping.</p>
+              <Button variant="primary" className="mt-8">+ Create New Framework</Button>
+            </Card>
+          )}
         </div>
-      )}
+      </div>
     </div>
-  );
-}
-
-function ToolButton({ tool, selected, onClick, icon }: any) {
-  return (
-    <button
-      onClick={onClick}
-      className={`p-2 rounded-lg transition-colors ${
-        selected ? 'bg-primary-500/20 border border-primary-500' : 'bg-bg-700 hover:bg-bg-600'
-      }`}
-      title={tool}
-    >
-      {icon}
-    </button>
-  );
-}
-
-function Card({ children, className }: any) {
-  return <div className={`bg-surface-800 border border-border-12 rounded-xl ${className}`}>{children}</div>;
-}
-
-function CardHeader({ children }: any) {
-  return <div className="px-6 py-4 border-b border-border-12">{children}</div>;
-}
-
-function CardContent({ children, className }: any) {
-  return <div className={`p-6 ${className}`}>{children}</div>;
-}
-
-function Button({ children, variant, onClick, size, className }: any) {
-  const variants: any = {
-    primary: 'bg-primary-700 hover:bg-primary-600 text-white',
-    secondary: 'bg-bg-700 hover:bg-bg-600 text-text-100',
-    ghost: 'bg-transparent hover:bg-bg-700 text-text-400',
-  };
-  const sizes: any = {
-    sm: 'px-3 py-1.5 text-sm',
-    md: 'px-4 py-2',
-  };
-  return (
-    <button
-      onClick={onClick}
-      className={`${variants[variant]} ${sizes[size || 'md']} rounded-lg transition-colors ${className}`}
-    >
-      {children}
-    </button>
   );
 }

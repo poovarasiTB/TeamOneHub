@@ -1,21 +1,24 @@
 import React from 'react';
 
-export function Button({ 
-  children, 
-  variant = 'primary', 
-  size = 'md', 
+export function Button({
+  children,
+  variant = 'primary',
+  size = 'md',
   isLoading = false,
   onClick,
   disabled,
   className = '',
 }: any) {
   const baseStyles = 'inline-flex items-center justify-center font-semibold rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed';
-  
+
   const variants: Record<string, string> = {
     primary: 'bg-gradient-to-r from-primary-700 to-primary-600 hover:from-primary-600 hover:to-primary-500 text-white shadow-lg shadow-primary-700/30',
     secondary: 'bg-surface-750 border border-border-20 text-text-80 hover:bg-surface-700',
+    outline: 'bg-transparent border border-border-20 text-text-80 hover:bg-surface-700',
     tertiary: 'bg-transparent text-primary-500 hover:bg-primary-500/10',
     danger: 'bg-gradient-to-r from-error to-error/80 text-white shadow-lg shadow-error/30',
+    warning: 'bg-warning-500/20 text-warning-400 border border-warning-500/30 hover:bg-warning-500/30',
+    success: 'bg-success-500/20 text-success-400 border border-success-500/30 hover:bg-success-500/30',
   };
 
   const sizes: Record<string, string> = {

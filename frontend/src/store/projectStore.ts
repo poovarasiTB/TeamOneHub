@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import apiClient from '../lib/api';
+import { apiClient } from '@/lib/api';
 
 interface Project {
   id: string;
@@ -8,8 +8,14 @@ interface Project {
   description?: string;
   status: 'planning' | 'active' | 'on-hold' | 'completed' | 'cancelled';
   type: 'fixed-price' | 'time-materials' | 'retainer' | 'internal';
+  industryTemplate?: string;
+  billingType?: string;
+  hourlyRate?: number;
   budget?: number;
   currency: string;
+  dataClassification?: string;
+  isGdprRelevant?: boolean;
+  retentionDays?: number;
   startDate: string;
   endDate?: string;
   healthStatus: 'green' | 'yellow' | 'red';
@@ -30,7 +36,7 @@ interface ProjectState {
     total: number;
     totalPages: number;
   };
-  
+
   fetchProjects: (filters?: any) => Promise<void>;
   fetchProject: (id: string) => Promise<void>;
   createProject: (data: Partial<Project>) => Promise<void>;
@@ -54,11 +60,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   fetchProjects: async (filters?: any) => {
     set({ isLoading: true, error: null });
-    
+
     try {
       const response = await apiClient.get('/work/projects', { params: filters });
       const { data, pagination } = response.data;
-      
+
       set({
         projects: data,
         pagination,
@@ -74,7 +80,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   fetchProject: async (id: string) => {
     set({ isLoading: true, error: null });
-    
+
     try {
       const response = await apiClient.get(`/work/projects/${id}`);
       set({
@@ -91,11 +97,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   createProject: async (data: Partial<Project>) => {
     set({ isLoading: true, error: null });
-    
+
     try {
       const response = await apiClient.post('/work/projects', data);
       const newProject = response.data;
-      
+
       set((state) => ({
         projects: [newProject, ...state.projects],
         currentProject: newProject,
@@ -112,11 +118,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   updateProject: async (id: string, data: Partial<Project>) => {
     set({ isLoading: true, error: null });
-    
+
     try {
       const response = await apiClient.patch(`/work/projects/${id}`, data);
       const updatedProject = response.data;
-      
+
       set((state) => ({
         projects: state.projects.map((p) => (p.id === id ? updatedProject : p)),
         currentProject: updatedProject,
@@ -133,10 +139,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   deleteProject: async (id: string) => {
     set({ isLoading: true, error: null });
-    
+
     try {
       await apiClient.delete(`/work/projects/${id}`);
-      
+
       set((state) => ({
         projects: state.projects.filter((p) => p.id !== id),
         currentProject: state.currentProject?.id === id ? null : state.currentProject,

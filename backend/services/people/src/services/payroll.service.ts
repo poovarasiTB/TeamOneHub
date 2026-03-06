@@ -41,48 +41,70 @@ export class PayrollService {
     const offset = (page - 1) * limit;
 
     let query = `
-      SELECT * FROM payroll_records
-      WHERE tenant_id = $1
+      SELECT p.*, e.first_name || ' ' || e.last_name as employee_name
+      FROM payroll_records p
+      LEFT JOIN employees e ON p.employee_id = e.id
+      WHERE p.tenant_id = $1
     `;
 
     const values: any[] = [tenantId];
     let paramIndex = 2;
 
     if (employeeId) {
-      query += ` AND employee_id = $${paramIndex}`;
+      query += ` AND p.employee_id = $${paramIndex}`;
       values.push(employeeId);
       paramIndex++;
     }
 
     if (status) {
-      query += ` AND status = $${paramIndex}`;
+      query += ` AND p.status = $${paramIndex}`;
       values.push(status);
       paramIndex++;
     }
 
     if (periodStart) {
-      query += ` AND period_start >= $${paramIndex}`;
+      query += ` AND p.period_start >= $${paramIndex}`;
       values.push(periodStart);
       paramIndex++;
     }
 
     if (periodEnd) {
-      query += ` AND period_end <= $${paramIndex}`;
+      query += ` AND p.period_end <= $${paramIndex}`;
       values.push(periodEnd);
       paramIndex++;
     }
 
-    const countQuery = query.replace('SELECT *', 'SELECT COUNT(*)');
+    const countQuery = query.replace("SELECT p.*, e.first_name || ' ' || e.last_name as employee_name", 'SELECT COUNT(*)');
     const countResult = await this.pool.query(countQuery, values);
     const total = parseInt(countResult.rows[0].count);
 
-    query += ` ORDER BY period_start DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    query += ` ORDER BY p.period_start DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
     values.push(limit, offset);
 
     const result = await this.pool.query(query, values);
 
+    const mapRowToCamelCase = (row: any) => ({
+      id: row.id,
+      tenantId: row.tenant_id,
+      employeeId: row.employee_id,
+      employeeName: row.employee_name,
+      payPeriodStart: row.period_start,
+      payPeriodEnd: row.period_end,
+      basicSalary: parseFloat(row.basic_salary) || 0,
+      allowances: row.allowances || {},
+      deductions: row.deductions || {},
+      grossPay: parseFloat(row.gross_salary) || 0,
+      netPay: parseFloat(row.net_salary) || 0,
+      status: row.status,
+      paymentDate: row.payment_date,
+      paymentReference: row.payment_reference,
+      notes: row.notes,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    });
+
     return {
-      data: result.rows,
+      data: result.rows.map(mapRowToCamelCase),
       pagination: {
         page,
         limit,
@@ -92,17 +114,46 @@ export class PayrollService {
     };
   }
 
-  async findById(id: string, tenantId: string): Promise<PayrollRecord | null> {
+  async findById(id: string, tenantId: string): Promise<any | null> {
     const query = `
-      SELECT * FROM payroll_records
-      WHERE id = $1 AND tenant_id = $2
+      SELECT p.*, e.first_name || ' ' || e.last_name as employee_name
+      FROM payroll_records p
+      LEFT JOIN employees e ON p.employee_id = e.id
+      WHERE p.id = $1 AND p.tenant_id = $2
     `;
 
     const result = await this.pool.query(query, [id, tenantId]);
-    return result.rows[0] || null;
+    if (!result.rows[0]) return null;
+
+    const row = result.rows[0];
+    return {
+      id: row.id,
+      tenantId: row.tenant_id,
+      employeeId: row.employee_id,
+      employeeName: row.employee_name,
+      payPeriodStart: row.period_start,
+      payPeriodEnd: row.period_end,
+      basicSalary: parseFloat(row.basic_salary) || 0,
+      allowances: row.allowances || {},
+      deductions: row.deductions || {},
+      grossPay: parseFloat(row.gross_salary) || 0,
+      netPay: parseFloat(row.net_salary) || 0,
+      status: row.status,
+      paymentDate: row.payment_date,
+      paymentReference: row.payment_reference,
+      notes: row.notes,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
   }
 
-  async generatePayroll(data: Partial<PayrollRecord>, userId: string, tenantId: string): Promise<PayrollRecord> {
+  async generatePayroll(data: Partial<PayrollRecord>, userId: string, tenantId: string): Promise<any> {
+    // Generate for all active employees if no specific employeeId is provided
+    if (!data.employeeId) {
+      // In a real app we would loop through active employees. For MVP we will just return a mock response or error
+      throw new Error('employeeId is required for MVP');
+    }
+
     const query = `
       INSERT INTO payroll_records (
         tenant_id, employee_id, period_start, period_end,
@@ -133,7 +184,7 @@ export class PayrollService {
     return result.rows[0];
   }
 
-  async processPayroll(id: string, userId: string, tenantId: string): Promise<PayrollRecord> {
+  async processPayroll(id: string, userId: string, tenantId: string): Promise<any> {
     const query = `
       UPDATE payroll_records
       SET
@@ -146,10 +197,22 @@ export class PayrollService {
 
     const result = await this.pool.query(query, [userId, id, tenantId]);
     logger.info(`Payroll processed: ${id}`);
-    return result.rows[0];
+    const row = result.rows[0];
+    return {
+      id: row.id,
+      tenantId: row.tenant_id,
+      employeeId: row.employee_id,
+      payPeriodStart: row.period_start,
+      payPeriodEnd: row.period_end,
+      grossPay: parseFloat(row.gross_salary) || 0,
+      netPay: parseFloat(row.net_salary) || 0,
+      status: row.status,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
   }
 
-  async markPaid(id: string, paymentDate: string, paymentReference: string, userId: string, tenantId: string): Promise<PayrollRecord> {
+  async markPaid(id: string, paymentDate: string, paymentReference: string, userId: string, tenantId: string): Promise<any> {
     const query = `
       UPDATE payroll_records
       SET
@@ -164,7 +227,19 @@ export class PayrollService {
 
     const result = await this.pool.query(query, [paymentDate, paymentReference, userId, id, tenantId]);
     logger.info(`Payroll marked paid: ${id}`);
-    return result.rows[0];
+    const row = result.rows[0];
+    return {
+      id: row.id,
+      tenantId: row.tenant_id,
+      employeeId: row.employee_id,
+      payPeriodStart: row.period_start,
+      payPeriodEnd: row.period_end,
+      grossPay: parseFloat(row.gross_salary) || 0,
+      netPay: parseFloat(row.net_salary) || 0,
+      status: row.status,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
   }
 
   async getMonthlyStats(tenantId: string, year: number, month: number) {

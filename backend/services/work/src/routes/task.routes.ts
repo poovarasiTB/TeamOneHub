@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { TaskService } from '../services/task.service';
+import { TaskDependencyController } from '../controllers/task-dependency.controller';
 import { authenticate, AuthRequest } from '../middleware/auth';
 
 const router = Router();
@@ -97,6 +98,48 @@ router.delete('/:id', async (_req: AuthRequest, res: Response, next: any) => {
     const taskId = Array.isArray(_req.params.id) ? _req.params.id[0] : _req.params.id;
     await taskService.delete(taskId, _req.user?.id || '', _req.user?.tenantId || '');
     return res.status(204).send();
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// --- Task Dependency Routes ---
+const dependencyController = new TaskDependencyController();
+
+/**
+ * GET /api/tasks/:id/dependencies
+ * Get task dependencies
+ */
+router.get('/:id/dependencies', async (_req: AuthRequest, res: Response, next: any) => {
+  try {
+    const result = await dependencyController.findByTaskId(_req, res, next);
+    return result;
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/**
+ * POST /api/tasks/:id/dependencies
+ * Create task dependency
+ */
+router.post('/:id/dependencies', async (_req: AuthRequest, res: Response, next: any) => {
+  try {
+    const result = await dependencyController.create(_req, res, next);
+    return result;
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/**
+ * DELETE /api/tasks/:id/dependencies/:dependencyId
+ * Delete task dependency
+ */
+router.delete('/:id/dependencies/:dependencyId', async (_req: AuthRequest, res: Response, next: any) => {
+  try {
+    const result = await dependencyController.delete(_req, res, next);
+    return result;
   } catch (error) {
     return next(error);
   }
